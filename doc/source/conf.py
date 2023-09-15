@@ -120,6 +120,8 @@ EXTERNAL_GROUPS        = YES
 # Graph generation
 
 GENERATE_XML             = YES
+GENERATE_LATEX           = NO
+GENERATE_HTML            = NO
 
 # this is used to hide protected members
 PREDEFINED = GKO_HAVE_PAPI_SDE=1 GINKGO_BUILD_MPI=1 GINKGO_BUILD_DOXYGEN=1 protected=private
