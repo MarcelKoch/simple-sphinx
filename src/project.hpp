@@ -108,6 +108,23 @@ struct is_thing : std::false_type{};
 */
 template<typename T> struct is_thing<T, double>: std::true_type {};
 
+/**
+* brief
+*/
+template<typename T> struct is_thing<T, int>: std::true_type {};
+
+
+/**
+*  a typedef description
+*/
+using my_type = D;
+
+/**
+*  a templated typedef description
+*/
+template<typename X>
+using my_template_type = is_thing<int, X>;
+
 
 /**
 * Doc for function

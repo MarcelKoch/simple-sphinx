@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import sys
 import xml.dom.minicompat
 from dataclasses import dataclass
@@ -5,7 +7,7 @@ from functools import singledispatch
 import xml.dom.minidom as MD
 import xml.dom.minicompat as MDC
 from pathlib import Path
-from typing import Tuple, Union, List
+from typing import Tuple, Union, List, Dict, Set
 import json
 
 gko_directory = "/home/marcel/projects/working-trees/ginkgo/document-create-functions/doc/doxygen/xml"
@@ -88,7 +90,7 @@ def dispatch_element(expr: MD.Element, ctx):
     return dispatch(classes[f"xml_{expr.tagName}"](expr), ctx)
 
 
-def getElementsByTagName(node: MD.Element, tag):
+def getElementsByTagName(node: MD.Element | MD.Document, tag):
     # This function is not recursive compared to Element.getElementsByTagName
     elements = []
     for child in node.childNodes:
@@ -108,17 +110,19 @@ def dispatch_(expr: classes['xml_group'] | classes["xml_dir"], ctx):
 def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes["xml_union"], ctx):
     # Find the class id ( used for files/html/etc )
     payload = expr.payload
+    name = dispatch(getElementsByTagName(payload, 'compoundname'), ctx)
     data = {
         'type': payload.attributes['kind'].value,
         'id': payload.attributes['id'].value,
         'prot': payload.attributes['prot'].value,
-        'name': dispatch(getElementsByTagName(payload, 'compoundname'), ctx),
+        'name': name,
         'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
         'basecompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'basecompoundref')],
         'derivedcompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'derivedcompoundref')],
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')]
+        'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')],
+        'specializations': list(ctx.specializations[name])
     }
     return data
 
@@ -180,6 +184,7 @@ def dispatch_(expr: classes['xml_memberdef'], ctx):
     elif kind == 'function':
         return {
             **base_data,
+            'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
             'definition': dispatch(getElementsByTagName(payload, 'definition'), ctx),
             'return_type': dispatch(getElementsByTagName(payload, 'type'), ctx),
             'argsstring': dispatch(getElementsByTagName(payload, 'argsstring'), ctx),
@@ -194,6 +199,7 @@ def dispatch_(expr: classes['xml_memberdef'], ctx):
         return {
             **base_data,
             'base_type': dispatch(getElementsByTagName(payload, 'type'), ctx),
+            'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx)
         }
     elif kind == 'friend':
         return {
@@ -229,8 +235,18 @@ def dispatch_(expr: classes['xml_innerclass'], ctx):
 
 @dispatch.register
 def dispatch_(expr: classes['xml_templateparamlist'], ctx):
+    def dispatch_item(item):
+        _type = dispatch(getElementsByTagName(item, 'type'), ctx)
+        if declname := getElementsByTagName(item, 'declname'):
+            defname = getElementsByTagName(item, 'defname')
+            if dispatch(declname[0].childNodes[0], ctx) != dispatch(defname[0].childNodes[0], ctx):
+                raise AssertionError(
+                    f"Can't handle mismatched declaration and definition names: {declname}, {defname}.")
+            _type += dispatch(declname[0].childNodes, ctx)
+        return " ".join(_type)
+
     return [
-        dispatch(getElementsByTagName(item, 'type'), ctx) for item in getElementsByTagName(expr.payload, 'param')
+        dispatch_item(item) for item in getElementsByTagName(expr.payload, 'param')
     ]
 
 
@@ -434,27 +450,60 @@ def dispatch_document(expr: MD.Document, ctx):
 
 
 def dispatch_index(expr: MD.Document, ctx):
-    data = []
+    data = defaultdict(list)
     index = getElementsByTagName(expr, 'doxygenindex')[0]
+
+    def simplified_kind(kind):
+        if kind in ["class", "struct", "union"]:
+            return "class"
+        else:
+            return kind
+
     for compoud in getElementsByTagName(index, 'compound'):
         file = f"{ctx.directory}/{compoud.attributes['refid'].value}.xml"
-        if compoud.attributes['kind'].value != 'file':
+        kind = compoud.attributes['kind'].value
+        if kind != 'file':
             new_data = dispatch(MD.parse(file), ctx)
             if new_data:
-                data.append(new_data)
+                data[simplified_kind(kind)].append(new_data)
     return data
+
+
+def remove_specialization(name):
+    return name.partition('<')[0]
+
+
+def parse_all_class_names(dom: MD.Document):
+    index = dom.getElementsByTagName('doxygenindex')[0]
+    empty_ctx = Context(directory="", specializations=defaultdict(set))
+    all_classes = set()
+    for compound in getElementsByTagName(index, 'compound'):
+        kind = compound.attributes['kind'].value
+        if kind in ['class', 'struct']:
+            name = dispatch(getElementsByTagName(compound, 'name'), empty_ctx)
+            all_classes.add(name)
+
+    specializations = defaultdict(set)
+    for cl in all_classes:
+        base_name = remove_specialization(cl)
+        if base_name != cl:
+            specializations[base_name].add(cl)
+
+    return specializations
 
 
 @dataclass
 class Context(object):
     directory: str
+    specializations: defaultdict[Set[str]]
 
 
 xml_directory = simple_directory
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
-parsed = dispatch_index(dom, Context(directory=xml_directory))
-print(json.dumps(parsed, indent=2))
+specializations = parse_all_class_names(dom)
 
-pass
+parsed = dispatch_index(dom, Context(directory=xml_directory,
+                                     specializations=specializations))
+print(json.dumps(parsed, indent=2))
