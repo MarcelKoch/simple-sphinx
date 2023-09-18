@@ -7,13 +7,36 @@ class A{};
 
 /**
 *  Doc for B
+*
+*  with some math: \f$f(x) = 6x\f$
+*  other math \f(g(y) = 12y\f) (is not picked up by xml???)
+*  \f[
+       |I_2|=\left| \int_{0}^T \psi(t)
+             \left\{
+                u(a,t)-
+                \int_{\gamma(t)}^a
+                \frac{d\theta}{k(\theta,t)}
+                \int_{a}^\theta c(\xi)u_t(\xi,t)\,d\xi
+             \right\} dt
+          \right|
+   \f]
 */
 class B: public A{};
 
 /**
 *  Doc for C
 */
-class C {};
+class C {
+public:
+  /**
+  *  brief doc
+  *
+  *  detailed doc
+  */
+  struct inner_c{
+    double data;
+  };
+};
 
 /**
 *  Doc for D
@@ -37,11 +60,14 @@ public:
   */
   int f(){}
 
+
+  double data = 1.0;
+  std::string str{"abs"};
 protected:
   /**
   * brief desc
   */
-  void g(int i);
+  void g(int i, double d, B b = {});
 
 private:
   /**
