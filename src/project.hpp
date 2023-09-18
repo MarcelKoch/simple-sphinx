@@ -43,7 +43,18 @@ public:
 *
 *  Some inline code: `int i`
 */
-class D {};
+class D {
+public:
+
+  /**
+  *  brief
+  *  @tparam T some template parameter
+  *  @tparam N number of elements
+  */
+  template<typename T, int N>
+  void fn(std::array<T, N> t){}
+
+};
 
 /**
 *  Doc for E
@@ -66,6 +77,8 @@ public:
 protected:
   /**
   * brief desc
+  *
+  * @param i parameter i desciption
   */
   void g(int i, double d, B b = {});
 
@@ -82,6 +95,18 @@ private:
 * This references D and E
 */
 class MultiParent: public B, public C, public D {};
+
+
+/**
+* brief
+*/
+template<typename T, typename U>
+struct is_thing : std::false_type{};
+
+/**
+* brief
+*/
+template<typename T> struct is_thing<T, double>: std::true_type {};
 
 
 /**

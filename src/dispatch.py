@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Tuple, Union, List
 import json
 
-xml_directory = "/home/marcel/projects/working-trees/ginkgo/document-create-functions/doc/doxygen/xml"
+gko_directory = "/home/marcel/projects/working-trees/ginkgo/document-create-functions/doc/doxygen/xml"
+simple_directory = "/home/marcel/projects/simple-sphinx/doc/source/doxygen/xml"
 
 
 def constructor(self, payload):
@@ -29,6 +30,7 @@ classes = dict(create_class(name) for name in [
     "detaileddescription",
     "sectiondef",
     "memberdef",
+    "templateparamlist",
     "para",
     "ref",
     "computeroutput",
@@ -55,6 +57,7 @@ classes = dict(create_class(name) for name in [
     "ulink",
     "ndash",
     "enumvalue",
+    "templateparameterlist",
     # compounddef kinds
     "class",
     "struct",
@@ -72,9 +75,12 @@ def dispatch(expr, ctx):
 
 @dispatch.register
 def dispatch_nodelist(expr: list, ctx):
-    if len(expr) != 1:
+    if len(expr) > 1:
         raise AssertionError(f"Node list has to have length of 1. Please handle iteration at caller site")
-    return dispatch(expr[0], ctx)
+    if len(expr) == 0:
+        return []
+    else:
+        return dispatch(expr[0], ctx)
 
 
 @dispatch.register
@@ -107,6 +113,7 @@ def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes[
         'id': payload.attributes['id'].value,
         'prot': payload.attributes['prot'].value,
         'name': dispatch(getElementsByTagName(payload, 'compoundname'), ctx),
+        'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
         'basecompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'basecompoundref')],
         'derivedcompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'derivedcompoundref')],
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
@@ -218,6 +225,13 @@ def dispatch_(expr: classes['xml_innerclass'], ctx):
         **dict(expr.payload.attributes.items()),
         'name': dispatch(expr.payload.childNodes[0], ctx)
     }
+
+
+@dispatch.register
+def dispatch_(expr: classes['xml_templateparamlist'], ctx):
+    return [
+        dispatch(getElementsByTagName(item, 'type'), ctx) for item in getElementsByTagName(expr.payload, 'param')
+    ]
 
 
 @dispatch.register
@@ -436,6 +450,7 @@ class Context(object):
     directory: str
 
 
+xml_directory = simple_directory
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
