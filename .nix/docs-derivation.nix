@@ -3,12 +3,12 @@
 , python311
 , python311Packages
 , doxygen
-, gasp
-, target_src ? { outPath = ./../examples/sphinx; }
+, masp
+, target_src ? { outPath = ./../example; }
 }:
 
 stdenvNoCC.mkDerivation {
-  pname = "gasp-sphinx-example";
+  pname = "masp-sphinx-example";
   version = "0.0.0";
 
   src = target_src;
@@ -18,21 +18,17 @@ stdenvNoCC.mkDerivation {
     python311Packages.sphinx
     python311Packages.sphinx-rtd-theme
     doxygen
-    gasp
+    masp
   ];
 
   buildPhase = ''
     # C++ API generation
     doxygen Doxyfile_cpp
-    python3 ${gasp.outPath}/bin/gasp.py doxygen_cpp/xml --namespace duke > cpp_map.json
-    # C API generation
-    doxygen Doxyfile_c
-    python3 ${gasp.outPath}/bin/gasp.py doxygen_c/xml > c_map.json
+    python3 ${masp.outPath}/bin/dispatch.py > cpp_map.json
     # Ensure file tree exists in source
     mkdir -p source/cpp_api source/c_api
     # C++ and C template generation
-    python3 ${gasp.outPath}/bin/make_rst.py --title="C++" -t ${gasp.outPath}/templates/rst -m cpp_map.json -o source/cpp_api
-    python3 ${gasp.outPath}/bin/make_rst.py --title="C" -t ${gasp.outPath}/templates/rst -m c_map.json -o source/c_api
+    python3 ${masp.outPath}/bin/make_rst.py --title="C++" -t ${masp.outPath}/tmpl -m cpp_map.json -o source/cpp_api
     make html
   '';
 

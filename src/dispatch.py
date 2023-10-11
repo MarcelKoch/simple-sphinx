@@ -9,7 +9,7 @@ import json
 from frozendict import frozendict
 
 gko_directory = "../../ginkgo/document-create-functions/doc/doxygen/xml"
-simple_directory = "../doc/source/doxygen/xml"
+simple_directory = "doxygen/xml"
 
 
 def constructor(self, payload):
