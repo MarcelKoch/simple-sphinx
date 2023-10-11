@@ -9,7 +9,7 @@ class A{};
 *  Doc for B
 *
 *  with some math: \f$f(x) = 6x\f$
-*  other math \f(g(y) = 12y\f) (is not picked up by xml???)
+*  other math \f[ g(y) = 12y \f] (is not picked up by xml???)
 *  \f[
        |I_2|=\left| \int_{0}^T \psi(t)
              \left\{
