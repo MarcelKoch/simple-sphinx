@@ -72,7 +72,8 @@ def main():
 
     out_dir = Path(args.output)
     for data in var_map["class"]:
-        class_name = data['name']
+        # This is safer for use with http urls
+        class_name = data['id']
         out_name = class_name + ".rst"
         out_file = out_dir / out_name
         data["specializations"] = sorted(data["specializations"])
