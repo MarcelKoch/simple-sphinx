@@ -6,12 +6,15 @@
 {% for desc_line in desc %}
 {% if desc_line.type is defined %}
 {% if desc_line.type == 'block_code' %}
-.. code-block:: {{ desc_line.style }}
-{% for code_line in desc_line.code %}
-{{ code_line }}
-{% endfor %}
+
+.. code-block::
+
+   {{ desc_line.code }}  
 {% elif desc_line.type == 'block_math' %}
-{{ desc_line.code }}
+
+.. math:: formula  
+
+   {{ desc_line.code }}  
 {% endif %}
 {% else %}
 {{ desc_line }}
@@ -23,8 +26,8 @@
 {% for i in name %}={% endfor %}
 
 
-Description
------------
+Description  
+-----------  
 
 {{ print_desc(briefdescription) }}
 

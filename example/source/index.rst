@@ -18,5 +18,4 @@ Welcome to Gasp Example's documentation!
    :maxdepth: 2
    :caption: API Reference
 
-   c_api/index
    cpp_api/index
