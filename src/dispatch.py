@@ -8,8 +8,8 @@ from pathlib import Path
 import json
 from frozendict import frozendict
 
-gko_directory = "/home/marcel/projects/working-trees/ginkgo/document-create-functions/doc/doxygen/xml"
-simple_directory = "/home/marcel/projects/simple-sphinx/doc/source/doxygen/xml"
+gko_directory = "../../ginkgo/document-create-functions/doc/doxygen/xml"
+simple_directory = "../doc/source/doxygen/xml"
 
 
 def constructor(self, payload):
