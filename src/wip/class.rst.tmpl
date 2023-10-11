@@ -4,24 +4,27 @@
 
 {% macro print_desc(desc) %}
 {% for desc_line in desc %}
-  {% if desc_line.type is defined and desc_line.type == 'block_code' %}
+{% if desc_line.type is defined %}
+{% if desc_line.type == 'block_code' %}
 .. code-block:: {{ desc_line.style }}
-  	{% for code_line in desc_line.code +%}
-	 {{ code_line }}
-	  {% endfor %}
-	{% else %}
-{{ desc_line }}
-	{% endif %}
+{% for code_line in desc_line.code %}
+{{ code_line }}
 {% endfor %}
-{% endmacro %}
-
+{% elif desc_line.type == 'block_math' %}
+{{ desc_line.code }}
+{% endif %}
+{% else %}
+{{ desc_line }}
+{% endif %}
+{% endfor %}
+{% endmacro -%}
 
 {{ name }}
 {% for i in name %}={% endfor %}
 
+
 Description
 -----------
-
 
 {{ print_desc(briefdescription) }}
 
@@ -35,9 +38,9 @@ Specializations
 
 .. toctree::
    :maxdepth: 1
-  {% for spec in specializations %}
+{% for spec in specializations %}
    {{ spec }}
-	{% endfor %}
+{% endfor %}
 {% endif %}
 
 {% if sectiondef|map(attribute="type")|select("equalto", "public-attrib")|map(attribute="members")|list|length > 0 %}
@@ -47,16 +50,16 @@ Vars
 ----
 
 {% for sec in sectiondef %}
-  {% if sec.type == "public-attrib" %}
-	  {% for attrib in sec.members %}
+{% if sec.type == "public-attrib" %}
+{% for attrib in sec.members %}
 .. cpp:member:: 		
-		  {%- if attrib.static %} static {% endif %}
-		  {% if attrib.mutable %} mutable {% endif %}
-	    {{- attrib.definition }}{{ attrib.initializer }}
+{%- if attrib.static %} static {% endif %}
+{% if attrib.mutable %} mutable {% endif %}
+{{ attrib.definition }}{{ attrib.initializer }}
 {{ print_desc(attrib.briefdescription) }}
 {{ print_desc(attrib.detaileddescription) }}
-		{% endfor %}
-	{% endif %}
+{% endfor %}
+{% endif %}
 {% endfor %}
 {% endif %}
 
