@@ -12,9 +12,11 @@
    {{ desc_line.code }}  
 {% elif desc_line.type == 'block_math' %}
 
-.. math:: formula  
+.. math::
 
    {{ desc_line.code }}  
+{% elif desc_line.type == 'inline_math' %}
+:math:`{{ desc_line.code }}`
 {% endif %}
 {% else %}
 {{ desc_line }}
