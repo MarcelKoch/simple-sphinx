@@ -83,10 +83,10 @@ def main():
         # endwith
     # endfor
 
-    out_globs = out_dir / "globals.rst"
-    template_globs = read_template(template_dir / "globals.rst.tmpl")
-    with open(out_globs, "w") as f:
-        f.write(template_globs.render(var_map))
+    # out_globs = out_dir / "globals.rst"
+    # template_globs = read_template(template_dir / "globals.rst.tmpl")
+    # with open(out_globs, "w") as f:
+    #     f.write(template_globs.render(var_map))
     # endwith
 
     # out_index = out_dir / "index.rst"
