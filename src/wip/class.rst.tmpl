@@ -2,6 +2,17 @@
 
 .. _{{ id }}:
 
+{% macro print_relatives(relatives) %}
+{% for rel in relatives %}
+{%- if rel.id is defined %}
+{% set ref_name = ':ref:`' + rel.name + '<' + rel.id + '>`' %}{{ ref_name }}
+{% else %}
+{{ rel.name }}
+{% endif -%}
+{%- if not loop.last %},
+{% endif -%}
+{% endfor %}
+{% endmacro %}
 {% macro print_desc(desc) %}
 {% for desc_line in desc %}
 {% if desc_line.type is defined %}
@@ -27,6 +38,14 @@
 {{ name }}
 {% for i in name %}={% endfor %}
 
+Inheritance
+-----------
+
+Children:
+{{ print_relatives(derivedcompoundref) }}
+
+Parents:
+{{ print_relatives(basecompoundref) }}
 
 Description  
 -----------  
