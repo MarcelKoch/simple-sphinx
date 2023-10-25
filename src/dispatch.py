@@ -140,7 +140,12 @@ def dispatch_(expr: classes['xml_compoundname'], ctx):
 
 @dispatch.register
 def dispatch_(expr: classes['xml_basecompoundref'] | classes['xml_derivedcompoundref'], ctx):
-    return dispatch(expr.payload.childNodes[0], ctx)
+    cmp = {
+        'name' : dispatch(expr.payload.childNodes[0], ctx)
+    }
+    if 'refid' in expr.payload.attributes:
+        cmp['id'] = expr.payload.attributes['refid'].value
+    return cmp
 
 
 @dispatch.register
