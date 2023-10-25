@@ -12,7 +12,9 @@
 {%- if not loop.last %},
 {% endif -%}
 {% endfor %}
+{% if relatives|length == 0 %}None{% endif %}
 {% endmacro %}
+
 {% macro print_desc(desc) %}
 {% for desc_line in desc %}
 {% if desc_line.type is defined %}
@@ -41,10 +43,10 @@
 Inheritance
 -----------
 
-Children:
+Inherited by:
 {{ print_relatives(derivedcompoundref) }}
 
-Parents:
+Inherits:
 {{ print_relatives(basecompoundref) }}
 
 Description  
