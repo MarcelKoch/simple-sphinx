@@ -470,46 +470,77 @@ def dispatch_index(expr: MD.Document, ctx):
     return data
 
 
-def parse_context(directory: str, dom: MD.Document):
-    index = dom.getElementsByTagName('doxygenindex')[0]
-    empty_ctx = Context(directory="", classes={}, specializations=defaultdict(set), specializationof=defaultdict(str))
-    all_classes = dict()
-    for compound in getElementsByTagName(index, 'compound'):
-        kind = compound.attributes['kind'].value
-        if kind in ['class', 'struct']:
-            name = dispatch(getElementsByTagName(compound, 'name'), empty_ctx)
-            all_classes[name] = compound.attributes['refid'].value
+def add_extra_context(data):
+    def visit_classes(visitor, data_):
+        match data_:
+            case {"type": "class", **kwargs} | {"type": "struct", **kwargs} :
+                visitor(data_)
+                visit_classes(visitor, kwargs)
+            case [*args]:
+                [visit_classes(visitor, d) for d in args]
+            case {**kwargs}:
+                [visit_classes(visitor, v) for _, v in kwargs.items()]
+            case _:
+                pass
 
-    def remove_specialization(name):
-        return name.partition('<')[0]
+    all_classes = dict()
+    def gather_all_classes(data_):
+                all_classes[data_["name"]] = data_["id"]
+    visit_classes(gather_all_classes, data)
 
     specializations = defaultdict(set)
     specializationof = defaultdict(dict)
-    for cl, id in all_classes.items():
-        base_name = remove_specialization(cl)
-        if base_name != cl:
-            specializations[base_name].add(frozendict(name=cl, id=id))
-            specializationof[cl] = dict(name=base_name, id=all_classes[base_name])
+    innerclass_of = defaultdict(dict)
+    def gather_extra_data(data_):
+        def remove_specialization(name):
+            return name.partition('<')[0]
 
-    return Context(directory=directory, classes=all_classes,
-                   specializations=specializations,
-                   specializationof=specializationof)
+        name = data_["name"]
+        id = data_["id"]
+
+        base_name = remove_specialization(name)
+        if name != base_name:
+            specializations[base_name].add(frozendict(name=name, id=id))
+            specializationof[name] = base_name
+
+        innerclasses = data_["innerclass"]
+        for ic in innerclasses:
+            innerclass_of[ic["name"]] = dict(name=name, id=id)
+    visit_classes(gather_extra_data, data)
+
+    def transform(data_):
+        match data_:
+            case {"type": "class", **kwargs} | {"type": "struct", **kwargs} :
+                name = kwargs["name"]
+                return {
+                    "type": data_["type"],
+                    **transform(kwargs),
+                    "specializations": list(specializations[name]),
+                    "specializationof": specializationof[name],
+                    "innerclassof": innerclass_of[name]
+                }
+            case [*args]:
+                return [transform(d) for d in args]
+            case {**kwargs}:
+                return {k: transform(v) for k, v in kwargs.items()}
+            case _:
+                return data_
+    return transform(data)
+
+
 
 
 @dataclass
 class Context(object):
     directory: str
-    classes: Dict[str, str]
-    specializations: defaultdict[Set[frozendict]]
-    specializationof: defaultdict[Dict]
 
 
 xml_directory = simple_directory
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
-ctx = parse_context(xml_directory, dom)
+parsed = dispatch_index(dom, Context(directory=xml_directory))
 
-parsed = dispatch_index(dom, ctx)
+parsed = add_extra_context(parsed)
 
 print(json.dumps(parsed, indent=2))
