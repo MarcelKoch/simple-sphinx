@@ -32,6 +32,8 @@ public:
   *  brief doc
   *
   *  detailed doc
+  *
+  *  with two paragraphs
   */
   struct inner_c{
     double data;
