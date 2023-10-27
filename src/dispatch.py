@@ -474,23 +474,23 @@ def dispatch_index(expr: MD.Document, ctx):
 def parse_all_class_names(dom: MD.Document):
     index = dom.getElementsByTagName('doxygenindex')[0]
     empty_ctx = Context(directory="", specializations=defaultdict(set), specializationof=defaultdict(str))
-    all_classes = set()
+    all_classes = dict()
     for compound in getElementsByTagName(index, 'compound'):
         kind = compound.attributes['kind'].value
         if kind in ['class', 'struct']:
             name = dispatch(getElementsByTagName(compound, 'name'), empty_ctx)
-            all_classes.add((name, compound.attributes['refid'].value))
+            all_classes[name] = compound.attributes['refid'].value
 
     def remove_specialization(name):
         return name.partition('<')[0]
 
     specializations = defaultdict(set)
     specializationof = defaultdict(dict)
-    for cl, id in all_classes:
+    for cl, id in all_classes.items():
         base_name = remove_specialization(cl)
         if base_name != cl:
             specializations[base_name].add(frozendict(name=cl, id=id))
-            specializationof[cl] = dict(name=base_name, id=id)
+            specializationof[cl] = dict(name=base_name, id=all_classes[base_name])
 
     return specializations, specializationof
 
