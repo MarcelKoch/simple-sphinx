@@ -471,9 +471,9 @@ def dispatch_index(expr: MD.Document, ctx):
     return data
 
 
-def parse_all_class_names(dom: MD.Document):
+def parse_context(directory: str, dom: MD.Document):
     index = dom.getElementsByTagName('doxygenindex')[0]
-    empty_ctx = Context(directory="", specializations=defaultdict(set), specializationof=defaultdict(str))
+    empty_ctx = Context(directory="", classes={}, specializations=defaultdict(set), specializationof=defaultdict(str))
     all_classes = dict()
     for compound in getElementsByTagName(index, 'compound'):
         kind = compound.attributes['kind'].value
@@ -492,12 +492,15 @@ def parse_all_class_names(dom: MD.Document):
             specializations[base_name].add(frozendict(name=cl, id=id))
             specializationof[cl] = dict(name=base_name, id=all_classes[base_name])
 
-    return specializations, specializationof
+    return Context(directory=directory, classes=all_classes,
+                   specializations=specializations,
+                   specializationof=specializationof)
 
 
 @dataclass
 class Context(object):
     directory: str
+    classes: Dict[str, str]
     specializations: defaultdict[Set[frozendict]]
     specializationof: defaultdict[Dict]
 
@@ -506,9 +509,8 @@ xml_directory = simple_directory
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
-specializations, specializationof = parse_all_class_names(dom)
+ctx = parse_context(xml_directory, dom)
 
-parsed = dispatch_index(dom, Context(directory=xml_directory,
-                                     specializations=specializations,
-                                     specializationof=specializationof))
+parsed = dispatch_index(dom, ctx)
+
 print(json.dumps(parsed, indent=2))
