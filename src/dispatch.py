@@ -9,6 +9,7 @@ import xml.dom.minicompat as MDC
 from pathlib import Path
 from typing import Tuple, Union, List, Dict, Set
 import json
+from frozendict import frozendict
 
 gko_directory = "/home/marcel/projects/working-trees/ginkgo/document-create-functions/doc/doxygen/xml"
 simple_directory = "/home/marcel/projects/simple-sphinx/doc/source/doxygen/xml"
@@ -122,7 +123,8 @@ def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes[
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
         'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')],
-        'specializations': list(ctx.specializations[name])
+        'specializations': list(dict(**kwargs) for kwargs in ctx.specializations[name]),
+        'specializationof': ctx.specializationof[name]
     }
     return data
 
@@ -469,41 +471,44 @@ def dispatch_index(expr: MD.Document, ctx):
     return data
 
 
-def remove_specialization(name):
-    return name.partition('<')[0]
-
-
 def parse_all_class_names(dom: MD.Document):
     index = dom.getElementsByTagName('doxygenindex')[0]
-    empty_ctx = Context(directory="", specializations=defaultdict(set))
+    empty_ctx = Context(directory="", specializations=defaultdict(set), specializationof=defaultdict(str))
     all_classes = set()
     for compound in getElementsByTagName(index, 'compound'):
         kind = compound.attributes['kind'].value
         if kind in ['class', 'struct']:
             name = dispatch(getElementsByTagName(compound, 'name'), empty_ctx)
-            all_classes.add(name)
+            all_classes.add((name, compound.attributes['refid'].value))
+
+    def remove_specialization(name):
+        return name.partition('<')[0]
 
     specializations = defaultdict(set)
-    for cl in all_classes:
+    specializationof = defaultdict(dict)
+    for cl, id in all_classes:
         base_name = remove_specialization(cl)
         if base_name != cl:
-            specializations[base_name].add(cl)
+            specializations[base_name].add(frozendict(name=cl, id=id))
+            specializationof[cl] = dict(name=base_name, id=id)
 
-    return specializations
+    return specializations, specializationof
 
 
 @dataclass
 class Context(object):
     directory: str
-    specializations: defaultdict[Set[str]]
+    specializations: defaultdict[Set[frozendict]]
+    specializationof: defaultdict[Dict]
 
 
 xml_directory = simple_directory
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
-specializations = parse_all_class_names(dom)
+specializations, specializationof = parse_all_class_names(dom)
 
 parsed = dispatch_index(dom, Context(directory=xml_directory,
-                                     specializations=specializations))
+                                     specializations=specializations,
+                                     specializationof=specializationof))
 print(json.dumps(parsed, indent=2))
