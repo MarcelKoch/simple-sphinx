@@ -10,6 +10,7 @@ Welcome to Simple Sphinx's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   myst_doc.md
 
 .. cpp:class:: ClassA
 
