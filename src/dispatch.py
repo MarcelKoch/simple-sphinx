@@ -124,7 +124,8 @@ def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes[
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
         'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')],
         'specializations': list(dict(**kwargs) for kwargs in ctx.specializations[name]),
-        'specializationof': ctx.specializationof[name]
+        'specializationof': ctx.specializationof[name],
+        'innerclasses': [dispatch(ic, ctx) for ic in getElementsByTagName(payload, 'innerclass')],
     }
     return data
 
