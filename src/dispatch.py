@@ -147,7 +147,7 @@ def dispatch_(expr: classes['xml_basecompoundref'] | classes['xml_derivedcompoun
 def dispatch_(expr: classes['xml_briefdescription'] | classes['xml_detaileddescription'], ctx):
     para = getElementsByTagName(expr.payload, 'para')
     if para:
-        return dispatch(para[0], ctx)
+        return sum([dispatch(p, ctx) for p in para], start=[])
     else:
         return [""]
 
