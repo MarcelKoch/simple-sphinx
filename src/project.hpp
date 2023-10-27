@@ -21,7 +21,14 @@ class A{};
           \right|
    \f]
 */
-class B: public A{};
+class B: public A{
+
+  /**
+  *  this has a function
+  */
+  void fn(int){}
+
+};
 
 /**
 *  Doc for C
@@ -148,3 +155,8 @@ using my_template_type = is_thing<int, X>;
 int my_function(int i, B b);
 
 }
+
+/**
+* function not inside of a namespace
+*/
+int my_function(int i, test::B b);
