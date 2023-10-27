@@ -98,6 +98,20 @@ class MultiParent: public B, public C, public D {};
 
 
 /**
+* Doc
+*/
+template<typename T> class Specialization{};
+
+
+/**
+* Doc with nested class
+*/
+template<> class Specialization<int>{
+  struct Foo{};
+};
+
+
+/**
 * brief
 */
 template<typename T, typename U>
