@@ -77,7 +77,6 @@ def main():
         out_name = class_name + ".rst"
         out_file = out_dir / out_name
         data["specializations"] = sorted(data["specializations"])
-        print(json.dumps(stringify(data), indent=2))
         with open(out_file, "w") as f:
             f.write(template.render(stringify(data)))
         # endwith
@@ -89,11 +88,12 @@ def main():
     #     f.write(template_globs.render(var_map))
     # endwith
 
-    # out_index = out_dir / "index.rst"
-    # template_index = read_template(template_dir / "index.rst.tmpl")
-    # var_map["class"] = dict(sorted(var_map["class"].items(), key=lambda k: k[1]["name"]))
-    # with open(out_index, "w") as f:
-    #     f.write(template_index.render(var_map))
+    out_index = out_dir / "index.rst"
+    template_index = read_template(template_dir / "index.rst.tmpl")
+    print(json.dumps(stringify(var_map), indent=2))
+    var_map["class"].sort(key=lambda k: k["name"])
+    with open(out_index, "w") as f:
+        f.write(template_index.render(var_map))
 
 
 if __name__ == "__main__":

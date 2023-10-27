@@ -1,0 +1,13 @@
+{{ title }}
+{% for t in title %}={% endfor %}
+{% if class|length > 0 %}
+
+.. toctree::
+		:maxdepth: 1
+		:caption: Class Reference
+		:name: toc-class-ref
+
+{% for cls in class %}
+		{{ cls.id }}
+{% endfor %}
+{% endif %}

@@ -22,6 +22,6 @@ stdenvNoCC.mkDerivation {
     mkdir -p $out/tmpl
     cp $src/src/dispatch.py $out/bin
     cp $src/src/wip/make_rst.py $out/bin
-    cp -r $src/src/wip/class.rst.tmpl $out/tmpl/
+    cp -r $src/src/wip/*.rst.tmpl $out/tmpl/
   '';
 }
