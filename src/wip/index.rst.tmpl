@@ -7,7 +7,7 @@
 		:caption: Class Reference
 		:name: toc-class-ref
 
-{% for cls in class %}
+{% for cls in class %}{% if 'name' not in cls.specializationof %}
 		{{ cls.id }}
-{% endfor %}
+{% endif %}{% endfor %}
 {% endif %}

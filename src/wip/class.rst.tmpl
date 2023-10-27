@@ -40,6 +40,15 @@
 {{ name }}
 {% for i in name %}={% endfor %}
 
+{% if templateparameters|length > 0 %}
+Template Arguments
+------------------
+{% for param in templateparameters %}
+{{ param }}{% if not loop.last %}, {% endif %}
+{% endfor %}
+{% endif %}
+
+
 Inheritance
 -----------
 
@@ -56,6 +65,11 @@ Description
 
 {{ print_desc(detaileddescription) }}
 
+{% if 'id' in specializationof %}
+Specialization of :ref:`{{ specializationof.name }}<{{specializationof.id}}>`  
+
+{% endif %}
+
 {% if specializations|length > 0 %}
 .. rst-class:: classref-reftable-group
 
@@ -64,8 +78,9 @@ Specializations
 
 .. toctree::
    :maxdepth: 1
+
 {% for spec in specializations %}
-   {{ spec }}
+   {{ spec.id }}
 {% endfor %}
 {% endif %}
 

@@ -15,6 +15,7 @@ stdenvNoCC.mkDerivation {
 
   nativeBuildInputs = [
     python311
+    python311Packages.frozendict
     python311Packages.sphinx
     python311Packages.sphinx-rtd-theme
     doxygen

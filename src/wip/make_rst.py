@@ -76,7 +76,7 @@ def main():
         class_name = data['id']
         out_name = class_name + ".rst"
         out_file = out_dir / out_name
-        data["specializations"] = sorted(data["specializations"])
+        data["specializations"] = sorted(data["specializations"], key=lambda k:k["name"])
         with open(out_file, "w") as f:
             f.write(template.render(stringify(data)))
         # endwith
