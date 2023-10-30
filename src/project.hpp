@@ -77,7 +77,7 @@ public:
 *  E e = {};
 *  ```
 */
-class E {
+struct E {
 public:
   /**
   * brief desc
@@ -158,9 +158,24 @@ using my_template_type = is_thing<int, X>;
 */
 int my_function(int i, B b);
 
+/**
+* why not document it?
+*/
+namespace nested{
 }
+
+}
+
+
+struct ClassWithoutNamespace{};
 
 /**
 * function not inside of a namespace
 */
 int my_function(int i, test::B b);
+
+
+/**
+* some macro, whatever
+*/
+#define TOP_LEVEL_MACRO
