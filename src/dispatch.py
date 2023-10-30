@@ -77,7 +77,7 @@ def dispatch(expr, ctx):
 
 
 @dispatch.register
-def dispatch_nodelist(expr: list, ctx):
+def dispatch_(expr: list, ctx):
     if len(expr) > 1:
         raise AssertionError(f"Node list has to have length of 1. Please handle iteration at caller site")
     if len(expr) == 0:
@@ -87,7 +87,7 @@ def dispatch_nodelist(expr: list, ctx):
 
 
 @dispatch.register
-def dispatch_element(expr: MD.Element, ctx):
+def dispatch_(expr: MD.Element, ctx):
     return dispatch(classes[f"xml_{expr.tagName}"](expr), ctx)
 
 
@@ -108,7 +108,7 @@ def dispatch_(expr: classes['xml_group'] | classes["xml_dir"], ctx):
 
 
 @dispatch.register
-def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes["xml_union"], ctx):
+def dispatch_(expr: classes["xml_class"] | classes["xml_struct"] | classes["xml_union"], ctx):
     # Find the class id ( used for files/html/etc )
     payload = expr.payload
     name = dispatch(getElementsByTagName(payload, 'compoundname'), ctx)
@@ -129,13 +129,13 @@ def dispatch_class(expr: classes["xml_class"] | classes["xml_struct"] | classes[
 
 
 @dispatch.register
-def dispatch_compounddef(expr: classes['xml_compounddef'], ctx):
+def dispatch_(expr: classes['xml_compounddef'], ctx):
     kind = expr.payload.attributes['kind'].value
     return dispatch(classes[f"xml_{kind}"](expr.payload), ctx)
 
 
 @dispatch.register
-def dispatch_compounddef(expr: classes['xml_compoundname'], ctx):
+def dispatch_(expr: classes['xml_compoundname'], ctx):
     return dispatch(expr.payload.childNodes[0], ctx)
 
 
@@ -440,13 +440,13 @@ def dispatch_(expr: classes['xml_formula'], ctx):
 
 
 @dispatch.register
-def dispatch_text(expr: MD.Text, ctx):
+def dispatch_(expr: MD.Text, ctx):
     stripped_text = expr.data.strip()
     return stripped_text
 
 
 @dispatch.register
-def dispatch_document(expr: MD.Document, ctx):
+def dispatch_(expr: MD.Document, ctx):
     return dispatch(getElementsByTagName(getElementsByTagName(expr, "doxygen")[0], "compounddef"), ctx)
 
 
