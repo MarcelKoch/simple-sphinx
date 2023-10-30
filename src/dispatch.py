@@ -1,13 +1,10 @@
 from collections import defaultdict
 
 import sys
-import xml.dom.minicompat
 from dataclasses import dataclass
 from functools import singledispatch
 import xml.dom.minidom as MD
-import xml.dom.minicompat as MDC
 from pathlib import Path
-from typing import Tuple, Union, List, Dict, Set
 import json
 from frozendict import frozendict
 
@@ -48,6 +45,7 @@ classes = dict(create_class(name) for name in [
     "argsstring",
     "location",
     "innerclass",
+    "innernamespace",
     "initializer",
     "formula",
     "simplesect",
@@ -68,6 +66,7 @@ classes = dict(create_class(name) for name in [
     "namespace",
     "group",
     "dir",
+    "file"
 ])
 
 
@@ -177,13 +176,13 @@ def dispatch_(expr: classes['xml_memberdef'], ctx):
 
     if kind == 'variable':
         initializer = getElementsByTagName(payload, 'initializer')
-        return {
+        data = {
             **base_data,
             'definition': dispatch(getElementsByTagName(payload, 'definition'), ctx),
             'initializer': dispatch(initializer, ctx) if initializer else "",
         }
     elif kind == 'function':
-        return {
+        data = {
             **base_data,
             'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
             'definition': dispatch(getElementsByTagName(payload, 'definition'), ctx),
@@ -191,34 +190,38 @@ def dispatch_(expr: classes['xml_memberdef'], ctx):
             'argsstring': dispatch(getElementsByTagName(payload, 'argsstring'), ctx),
         }
     elif kind == 'enum':
-        return {
+        data = {
             **base_data,
             # @todo: need qualified name?
             'items': [dispatch(item, ctx) for item in getElementsByTagName(payload, 'enumvalue')]
         }
     elif kind == 'typedef':
-        return {
+        data = {
             **base_data,
             'base_type': dispatch(getElementsByTagName(payload, 'type'), ctx),
             'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx)
         }
     elif kind == 'friend':
-        return {
+        data = {
             **base_data,
             'name': f"{dispatch(getElementsByTagName(payload, 'type'), ctx)} {base_data['name']}"
         }
+    elif kind == 'define':  # macros
+        data = base_data
     else:
         raise AssertionError(f"Encountered unexpected member kind: {kind}")
+    return data
 
 
 @dispatch.register
-def dispatch_(expr: classes['xml_namespace'], ctx):
+def dispatch_(expr: classes['xml_namespace'] | classes['xml_file'], ctx):
     payload = expr.payload
     data = {
-        'type': 'namespace',
+        'type': payload.attributes['kind'].value,
         'id': payload.attributes['id'].value,
         'name': dispatch(getElementsByTagName(payload, 'compoundname'), ctx),
         'innerclass': [dispatch(ic, ctx) for ic in getElementsByTagName(payload, 'innerclass')],
+        'innernamespace': [dispatch(nn, ctx) for nn in getElementsByTagName(payload, 'innernamespace')],
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
         'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')]
@@ -227,7 +230,7 @@ def dispatch_(expr: classes['xml_namespace'], ctx):
 
 
 @dispatch.register
-def dispatch_(expr: classes['xml_innerclass'], ctx):
+def dispatch_(expr: classes['xml_innerclass'] | classes['xml_innernamespace'], ctx):
     return {
         **dict(expr.payload.attributes.items()),
         'name': dispatch(expr.payload.childNodes[0], ctx)
@@ -451,29 +454,50 @@ def dispatch_(expr: MD.Document, ctx):
 
 
 def dispatch_index(expr: MD.Document, ctx):
-    data = defaultdict(list)
+    data = dict(
+        classes=dict(),
+        namespaces=dict(),
+        globals=dict()
+    )
+
     index = getElementsByTagName(expr, 'doxygenindex')[0]
 
-    def simplified_kind(kind):
-        if kind in ["class", "struct", "union"]:
-            return "class"
-        else:
-            return kind
-
+    map_kind = {"class": "classes", "struct": "classes", "union": "classes",
+                "namespace": "namespaces", "file": "globals"}
     for compoud in getElementsByTagName(index, 'compound'):
         file = f"{ctx.directory}/{compoud.attributes['refid'].value}.xml"
         kind = compoud.attributes['kind'].value
-        if kind != 'file':
-            new_data = dispatch(MD.parse(file), ctx)
-            if new_data:
-                data[simplified_kind(kind)].append(new_data)
+        new_data = dispatch(MD.parse(file), ctx)
+        if new_data and kind != "file":
+            data[map_kind[kind]][new_data["id"]] = new_data
+        if new_data and kind == "file":
+            innerclasses = new_data.pop('innerclass')
+            innernamespaces = new_data.pop('innernamespace')
+            sections = new_data.pop('sectiondef')
+            contains = innernamespaces + innerclasses
+            for sec in sections:
+                striped_section = []
+                for member in sec['members']:
+                    striped_section.append({
+                        'refid': member['id'],
+                        'prot': member['prot'],
+                        'name': member['name']
+                    })
+                contains += striped_section
+
+            data[map_kind[kind]][new_data["id"]] = {**new_data, 'contains': contains}
+
+            for sec in sections:
+                for member in sec['members']:
+                    data[map_kind[kind]][member["id"]] = member
+
     return data
 
 
 def add_extra_context(data):
     def visit_classes(visitor, data_):
         match data_:
-            case {"type": "class", **kwargs} | {"type": "struct", **kwargs} :
+            case {"type": "class", **kwargs} | {"type": "struct", **kwargs}:
                 visitor(data_)
                 visit_classes(visitor, kwargs)
             case [*args]:
@@ -484,13 +508,16 @@ def add_extra_context(data):
                 pass
 
     all_classes = dict()
+
     def gather_all_classes(data_):
-                all_classes[data_["name"]] = data_["id"]
+        all_classes[data_["name"]] = data_["id"]
+
     visit_classes(gather_all_classes, data)
 
     specializations = defaultdict(set)
     specializationof = defaultdict(dict)
     innerclass_of = defaultdict(dict)
+
     def gather_extra_data(data_):
         def remove_specialization(name):
             return name.partition('<')[0]
@@ -506,11 +533,12 @@ def add_extra_context(data):
         innerclasses = data_["innerclass"]
         for ic in innerclasses:
             innerclass_of[ic["name"]] = dict(name=name, id=id)
+
     visit_classes(gather_extra_data, data)
 
     def transform(data_):
         match data_:
-            case {"type": "class", **kwargs} | {"type": "struct", **kwargs} :
+            case {"type": "class", **kwargs} | {"type": "struct", **kwargs}:
                 name = kwargs["name"]
                 return {
                     "type": data_["type"],
@@ -525,9 +553,8 @@ def add_extra_context(data):
                 return {k: transform(v) for k, v in kwargs.items()}
             case _:
                 return data_
+
     return transform(data)
-
-
 
 
 @dataclass
@@ -540,7 +567,5 @@ index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
 parsed = dispatch_index(dom, Context(directory=xml_directory))
-
-parsed = add_extra_context(parsed)
 
 print(json.dumps(parsed, indent=2))
