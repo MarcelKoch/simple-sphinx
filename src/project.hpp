@@ -36,6 +36,10 @@ class B: public A{
 class C {
 public:
   /**
+  * docs
+  */
+  friend class B;
+  /**
   *  brief doc
   *
   *  detailed doc
