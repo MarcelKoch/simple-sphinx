@@ -495,69 +495,6 @@ def dispatch_index(expr: MD.Document, ctx):
     return data
 
 
-def add_extra_context(data):
-    def visit_classes(visitor, data_):
-        match data_:
-            case {"type": "class", **kwargs} | {"type": "struct", **kwargs}:
-                visitor(data_)
-                visit_classes(visitor, kwargs)
-            case [*args]:
-                [visit_classes(visitor, d) for d in args]
-            case {**kwargs}:
-                [visit_classes(visitor, v) for _, v in kwargs.items()]
-            case _:
-                pass
-
-    all_classes = dict()
-
-    def gather_all_classes(data_):
-        all_classes[data_["name"]] = data_["id"]
-
-    visit_classes(gather_all_classes, data)
-
-    specializations = defaultdict(set)
-    specializationof = defaultdict(dict)
-    innerclass_of = defaultdict(dict)
-
-    def gather_extra_data(data_):
-        def remove_specialization(name):
-            return name.partition('<')[0]
-
-        name = data_["name"]
-        id = data_["id"]
-
-        base_name = remove_specialization(name)
-        if name != base_name:
-            specializations[base_name].add(frozendict(name=name, id=id))
-            specializationof[name] = base_name
-
-        innerclasses = data_["innerclass"]
-        for ic in innerclasses:
-            innerclass_of[ic["name"]] = dict(name=name, id=id)
-
-    visit_classes(gather_extra_data, data)
-
-    def transform(data_):
-        match data_:
-            case {"type": "class", **kwargs} | {"type": "struct", **kwargs}:
-                name = kwargs["name"]
-                return {
-                    "type": data_["type"],
-                    **transform(kwargs),
-                    "specializations": list(specializations[name]),
-                    "specializationof": specializationof[name],
-                    "innerclassof": innerclass_of[name]
-                }
-            case [*args]:
-                return [transform(d) for d in args]
-            case {**kwargs}:
-                return {k: transform(v) for k, v in kwargs.items()}
-            case _:
-                return data_
-
-    return transform(data)
-
-
 @dataclass
 class Context(object):
     directory: str
