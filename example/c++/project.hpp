@@ -47,8 +47,22 @@ public:
   *  with two paragraphs
   */
   struct inner_c{
+    /**
+	 * brief description
+	 *
+	 * Detailed desc
+	 */
     double data;
   };
+
+  /**
+   * Some sort of function
+   *
+   * Detailed text about it
+   */
+  void fusrohda(bool why){
+		(void)why;
+  }
 };
 
 /**
