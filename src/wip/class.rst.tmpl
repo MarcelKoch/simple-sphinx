@@ -79,8 +79,8 @@ Specializations
 .. toctree::
    :maxdepth: 1
 
-{% for spec in specializations %}
-   {{ spec.id }}
+{% for key,spec in specializations.items() %}
+   {{ key }}
 {% endfor %}
 {% endif %}
 
