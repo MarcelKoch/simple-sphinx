@@ -122,7 +122,7 @@ def dispatch_(expr: classes["xml_class"] | classes["xml_struct"] | classes["xml_
         'derivedcompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'derivedcompoundref')],
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')],
+        'sectiondef': dict(dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')),
         'innerclass': [dispatch(ic, ctx) for ic in getElementsByTagName(payload, 'innerclass')],
     }
     return data
@@ -155,10 +155,8 @@ def dispatch_(expr: classes['xml_briefdescription'] | classes['xml_detaileddescr
 
 @dispatch.register
 def dispatch_(expr: classes['xml_sectiondef'], ctx):
-    return {
-        'type': expr.payload.attributes['kind'].value,
-        'members': [dispatch(member, ctx) for member in getElementsByTagName(expr.payload, "memberdef")]
-    }
+    return expr.payload.attributes['kind'].value, dict(dispatch(member, ctx) for member in
+                                                       getElementsByTagName(expr.payload, "memberdef"))
 
 
 @dispatch.register
@@ -211,7 +209,7 @@ def dispatch_(expr: classes['xml_memberdef'], ctx):
         data = base_data
     else:
         raise AssertionError(f"Encountered unexpected member kind: {kind}")
-    return data
+    return data['id'], data
 
 
 @dispatch.register
@@ -225,7 +223,7 @@ def dispatch_(expr: classes['xml_namespace'] | classes['xml_file'], ctx):
         'innernamespace': [dispatch(nn, ctx) for nn in getElementsByTagName(payload, 'innernamespace')],
         'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
         'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        'sectiondef': [dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')]
+        'sectiondef': dict(dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef'))
     }
     return data
 
@@ -458,7 +456,7 @@ def dispatch_index(expr: MD.Document, ctx):
     data = dict(
         classes=dict(),
         namespaces=dict(),
-        globals=dict()
+        globals=dict(sectiondef=dict())
     )
 
     index = getElementsByTagName(expr, 'doxygenindex')[0]
@@ -475,22 +473,24 @@ def dispatch_index(expr: MD.Document, ctx):
             innerclasses = new_data.pop('innerclass')
             innernamespaces = new_data.pop('innernamespace')
             sections = new_data.pop('sectiondef')
-            contains = innernamespaces + innerclasses
-            for sec in sections:
-                striped_section = []
-                for member in sec['members']:
-                    striped_section.append({
+            stripped_sections = defaultdict(list)
+            for sec_type, members in sections.items():
+                for member in members.values():
+                    stripped_sections[sec_type].append({
                         'refid': member['id'],
                         'prot': member['prot'],
                         'name': member['name']
                     })
-                contains += striped_section
 
-            data[map_kind[kind]][new_data["id"]] = {**new_data, 'contains': contains}
+            data[map_kind[kind]][new_data["id"]] = {**new_data, 'contains': {
+                'classes': innerclasses,
+                'namespaces': innernamespaces,
+                **stripped_sections
+            }}
 
-            for sec in sections:
-                for member in sec['members']:
-                    data[map_kind[kind]][member["id"]] = member
+            for sec_type, members in sections.items():
+                for member_id, member in members.items():
+                    data[map_kind[kind]]['sectiondef'].setdefault(sec_type, dict())[member_id] = member
 
     return data
 
