@@ -104,8 +104,8 @@ def getElementsByTagName(node: MD.Element | MD.Document, tag):
 
 @dispatch.register
 def dispatch_(expr: classes['xml_group'] | classes["xml_dir"], ctx):
-    print(f"Warning: encountered {expr.payload.attributes['kind'].value} documentation. This will be skipped!",
-          file=sys.stderr)
+    # print(f"Warning: encountered {expr.payload.attributes['kind'].value} documentation. This will be skipped!",
+    #       file=sys.stderr)
     return None
 
 
@@ -147,7 +147,7 @@ def dispatch_(expr: classes['xml_basecompoundref'] | classes['xml_derivedcompoun
     if "refid" in expr.payload.attributes:
         return {"refid": expr.payload.attributes["refid"].value, **base_data}
     else:
-        return base_data
+        return {"refid": None, **base_data}
 
 
 @dispatch.register
@@ -544,3 +544,48 @@ dom = MD.parse(str(index.resolve()))
 parsed = dispatch_index(dom, Context(directory=xml_directory))
 
 print(json.dumps(parsed, indent=2))
+
+
+def compute_extra_data(data):
+    specializations = defaultdict(set)
+    specialization_of = defaultdict(dict)
+    enclosing_class = defaultdict(lambda: None)
+    name_to_id = defaultdict(set)
+
+    def build_name_to_id(_data):
+        match _data:
+            case {"id": id, "name": name, **kwargs}:
+                name_to_id[name].add(id)
+                build_name_to_id(kwargs)
+            case list(l):
+                for v in l:
+                    build_name_to_id(v)
+            case dict(kwargs):
+                for v in kwargs.values():
+                    build_name_to_id(v)
+            case _:
+                pass
+
+    build_name_to_id(data)
+
+    def remove_specialization(name):
+        return name.partition('<')[0]
+
+    def maybe_add_specialization(cl_id, cl):
+        name = cl["name"]
+        trimmed_name = remove_specialization(name)
+        if name != trimmed_name and trimmed_name in name_to_id:
+            specializations[name_to_id[trimmed_name]].add(cl_id)
+            specialization_of[name_to_id[name]], _ = name_to_id[trimmed_name]
+
+    for cl_id, cl in data['classes'].items():
+        maybe_add_specialization(cl_id, cl)
+
+    for ic in cl["innerclass"]:
+        enclosing_class[ic["refid"]] = cl_id
+
+    return name_to_id, specializations, specialization_of, enclosing_class
+
+
+# ctx = compute_extra_data(parsed)
+pass
