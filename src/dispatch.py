@@ -249,11 +249,11 @@ def dispatch_(expr: classes['xml_templateparamlist'], ctx):
             if dispatch(declname[0].childNodes[0], ctx) != dispatch(defname[0].childNodes[0], ctx):
                 raise AssertionError(
                     f"Can't handle mismatched declaration and definition names: {declname}, {defname}.")
-            _type += dispatch(declname[0].childNodes, ctx)
-        return " ".join(_type)
+            _type.append(dispatch(declname[0].childNodes, ctx))
+        return {"parameter": _type}
 
     return [
-        dispatch_item(item) for item in getElementsByTagName(expr.payload, 'param')
+        {"type": "templateparameter", **dispatch_item(item)} for item in getElementsByTagName(expr.payload, 'param')
     ]
 
 
