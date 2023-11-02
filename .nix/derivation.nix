@@ -1,7 +1,7 @@
 { lib
 , stdenvNoCC
-, python310
-, python310Packages
+, python311
+, python311Packages
 }:
 
 stdenvNoCC.mkDerivation {
@@ -11,7 +11,7 @@ stdenvNoCC.mkDerivation {
   src = ./..;
 
   nativeBuildInputs = [
-    python310
+    python311
   ];
 
   buildPhase = ''
