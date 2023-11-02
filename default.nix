@@ -16,7 +16,7 @@ in rec {
     masp-xml = masp-example-xml;
   };
 
-  masp-ginkgo-sphinx = pkgs.callPackage .nix/docs-derivation.nix {
+  masp-sphinx-ginkgo = pkgs.callPackage .nix/docs-derivation.nix {
     inherit masp;
     masp-xml = masp-ginkgo-xml;
     pname = "masp-sphinx-ginkgo";
