@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import sys
+import argparse
 from dataclasses import dataclass
 from functools import singledispatch
 import xml.dom.minidom as MD
@@ -563,6 +564,19 @@ class Context(object):
 
 
 xml_directory = simple_directory
+
+parser = arg_parse.ArgumentParser(
+    description = "Translates doxygen xml output into a more sensible format"
+);
+
+parser.add_argument('-d', '--doxygen',
+    required = False,
+    default  = xml_directory,
+    help     = "Path to the doxygen generated xml directory"
+);
+
+args = parser.parse_args();
+
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
 
