@@ -60,6 +60,8 @@ classes = dict(create_class(name) for name in [
     "ndash",
     "enumvalue",
     "templateparameterlist",
+    "blockquote",
+    "heading",
     # compounddef kinds
     "class",
     "struct",
@@ -443,6 +445,22 @@ def dispatch_(expr: classes['xml_formula'], ctx):
         }
     else:
         raise AssertionError(f"Unrecognized math formula: {code}")
+
+
+@dispatch.register
+def dispatch_(expr: classes['xml_blockquote'], ctx):
+    return {"type": "blockquote",
+            "content": [dispatch(c, ctx) for c in expr.payload.childNodes]}
+
+
+@dispatch.register
+def dispatch_(expr: classes['xml_heading'], ctx):
+    return {
+        "type": "heading",
+        "level": expr.payload.attributes["level"].value,
+        "text": [dispatch(c, ctx) for c in expr.payload.childNodes]
+    }
+
 
 
 @dispatch.register
