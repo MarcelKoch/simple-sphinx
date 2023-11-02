@@ -39,10 +39,10 @@ def read_var_map(path):
     # endwith
 
 def strip_class_name_specialization(name):
-    return ''.join(name.partition('<')[0:1]).rstrip();
+    return ''.join(name.partition('<')[0:1]).rstrip()
 
 def is_class_name_specialization(name):
-    return strip_class_name_specialization(name) != name;
+    return strip_class_name_specialization(name) != name
 
 def stringify(expr):
     match expr:
@@ -68,35 +68,35 @@ def stringify(expr):
 def get_class_id_by_name(name, classes):
     for key, data in classes.items():
         if data['name'] == name:
-            return key;
+            return key
         #endif
     #endfor
-    print("Couldn't find name in class");
-    exit(-1);
+    print("Couldn't find name in class")
+    exit(-1)
 
 def main():
-    args = parse_args();
+    args = parse_args()
 
-    template_dir = Path(args.template);
-    template = read_template(template_dir / "class.rst.tmpl");
-    var_map = read_var_map(args.map);
+    template_dir = Path(args.template)
+    template = read_template(template_dir / "class.rst.tmpl")
+    var_map = read_var_map(args.map)
 
-    var_map['title'] = args.title;
+    var_map['title'] = args.title
 
     for key, data in var_map["classes"].items():
-        data["specializations"] = {};
-        data['is_special'] = is_class_name_specialization(data["name"]);
+        data["specializations"] = {}
+        data['is_special'] = is_class_name_specialization(data["name"])
         if data['is_special']:
-            stripped_name = strip_class_name_specialization(data["name"]);
-            stripped_id = get_class_id_by_name(stripped_name, var_map["classes"]);
-            data['specialization_of'] = stripped_id;
+            stripped_name = strip_class_name_specialization(data["name"])
+            stripped_id = get_class_id_by_name(stripped_name, var_map["classes"])
+            data['specialization_of'] = stripped_id
         #endif
     #endfor
     for key, data in var_map["classes"].items():
         for inner_key, inner_data in var_map["classes"].items():
             if inner_data['is_special']:
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
-                    data['specializations'][inner_key] = {'name':inner_data['name']};
+                    data['specializations'][inner_key] = {'name':inner_data['name']}
             #endif
         #endfor
     #endfor
@@ -122,7 +122,7 @@ def main():
     out_index = out_dir / "index.rst"
     template_index = read_template(template_dir / "index.rst.tmpl")
     # print(json.dumps(stringify(var_map), indent=2))
-    var_map["classes"] = dict(sorted(var_map["classes"].items(), key = lambda k: k[1]['name']));
+    var_map["classes"] = dict(sorted(var_map["classes"].items(), key = lambda k: k[1]['name']))
     with open(out_index, "w") as f:
         f.write(template_index.render(var_map))
 

@@ -565,17 +565,17 @@ class Context(object):
 
 xml_directory = simple_directory
 
-parser = arg_parse.ArgumentParser(
+parser = argparse.ArgumentParser(
     description = "Translates doxygen xml output into a more sensible format"
-);
+)
 
 parser.add_argument('-d', '--doxygen',
     required = False,
     default  = xml_directory,
     help     = "Path to the doxygen generated xml directory"
-);
+)
 
-args = parser.parse_args();
+args = parser.parse_args()
 
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
