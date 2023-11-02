@@ -26,9 +26,15 @@ stdenvNoCC.mkDerivation {
     masp
   ];
 
-  configurePhase = ''
-
-  '';
+  cmakeFlags = [
+    (lib.cmakeBool "GINKGO_BUILD_TEST" false)
+    (lib.cmakeBool "GINKGO_BUILD_REFERENCE" false)
+    (lib.cmakeBool "GINKGO_BUILD_BENCHMARKS" false)
+    (lib.cmakeBool "GINKGO_BUILD_OMP" false)
+    (lib.cmakeBool "GINKGO_BUILD_EXAMPLES" false)
+    (lib.cmakeBool "GINKGO_BUILD_MPI" false)
+    (lib.cmakeBool "GINKGO_MIXED_PRECISION" false)
+  ];
 
   buildPhase = ''
     # C++ API generation
