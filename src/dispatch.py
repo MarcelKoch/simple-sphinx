@@ -503,16 +503,18 @@ class Context(object):
 xml_directory = simple_directory
 
 parser = argparse.ArgumentParser(
-    description = "Translates doxygen xml output into a more sensible format"
+    description="Translates doxygen xml output into a more sensible format"
 )
 
 parser.add_argument('-d', '--doxygen',
-    required = False,
-    default  = xml_directory,
-    help     = "Path to the doxygen generated xml directory"
-)
+                    required=False,
+                    default=xml_directory,
+                    help="Path to the doxygen generated xml directory"
+                    )
 
 args = parser.parse_args()
+
+xml_directory = args.doxygen or xml_directory
 
 index = Path(xml_directory) / "index.xml"
 dom = MD.parse(str(index.resolve()))
