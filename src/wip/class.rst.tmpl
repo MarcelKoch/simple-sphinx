@@ -4,11 +4,7 @@
 
 {% macro print_relatives(relatives) %}
 {% for rel in relatives %}
-{%- if rel.refid is defined %}
-{% set ref_name = ':ref:`' + rel.name + '<' + rel.refid + '>`' %}{{ ref_name }}
-{% else %}
-{{ rel.name }}
-{% endif -%}
+print something
 {%- if not loop.last %},
 {% endif -%}
 {% endfor %}

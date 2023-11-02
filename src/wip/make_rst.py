@@ -38,11 +38,14 @@ def read_var_map(path):
         return json.loads(f.read())
     # endwith
 
+
 def strip_class_name_specialization(name):
     return ''.join(name.partition('<')[0:1]).rstrip()
 
+
 def is_class_name_specialization(name):
     return strip_class_name_specialization(name) != name
+
 
 def stringify(expr):
     match expr:
@@ -50,8 +53,10 @@ def stringify(expr):
             return body
         case list(l):
             return [stringify(elems) for elems in l]
-        case {"type": "reference", "name": name, "refid": id}:
-            return f":any:`{name}<{id}>`"
+        case {"name": name, "refid": id}:
+            bracket_replacement = '\\<'
+            id_str = f"<{id}>" if id else ""
+            return  f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
         case {"type": "inline_math", "code": code}:
             return f":math:`{code}`"
         case {"type": "inline_code", "code": code}:
@@ -60,19 +65,23 @@ def stringify(expr):
             return {"type": "block_code", "style": style, "code": code.splitlines()}
         case {"type": "parameter", "name": name, "description": desc}:
             return f":param {name}: {desc}"
+        case {"type": "templateparameter", "parameter": param}:
+            return ' '.join(stringify(param))
         case dict(d):
             return dict(
                 (key, stringify(value)) for key, value in d.items()
             )
 
+
 def get_class_id_by_name(name, classes):
     for key, data in classes.items():
         if data['name'] == name:
             return key
-        #endif
-    #endfor
+        # endif
+    # endfor
     print("Couldn't find name in class")
     exit(-1)
+
 
 def main():
     args = parse_args()
@@ -95,7 +104,7 @@ def main():
         for inner_key, inner_data in var_map["classes"].items():
             if inner_data['is_special']:
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
-                    data['specializations'][inner_key] = {'name':inner_data['name']}
+                    data['specializations'][inner_key] = {'name': inner_data['name']}
 
     for key, data in var_map["classes"].items():
         for ic in data["innerclass"]:
@@ -107,10 +116,11 @@ def main():
         class_name = key
         out_name = class_name + ".rst"
         out_file = out_dir / out_name
-        data["specializations"] = dict(sorted(data["specializations"].items(), key=lambda k:k[1]["name"]))
+        data["specializations"] = dict(sorted(data["specializations"].items(), key=lambda k: k[1]["name"]))
         data["hidden"] = data.get("is_special", False) or data.get("is_inner", False)
         with open(out_file, "w") as f:
-            f.write(template.render(stringify(data)))
+            string_data = stringify(data)
+            f.write(template.render(string_data))
         # endwith
     # endfor
 
@@ -123,7 +133,7 @@ def main():
     out_index = out_dir / "index.rst"
     template_index = read_template(template_dir / "index.rst.tmpl")
     # print(json.dumps(stringify(var_map), indent=2))
-    var_map["classes"] = dict(sorted(var_map["classes"].items(), key = lambda k: k[1]['name']))
+    var_map["classes"] = dict(sorted(var_map["classes"].items(), key=lambda k: k[1]['name']))
     with open(out_index, "w") as f:
         f.write(template_index.render(var_map))
 
