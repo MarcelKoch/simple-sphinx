@@ -6,7 +6,7 @@
 , graphviz
 , cmake
 , texlive
-, fontconfig
+, font-manager
 }:
 
 stdenv.mkDerivation {
@@ -26,8 +26,8 @@ stdenv.mkDerivation {
     python311Packages.sphinx-rtd-theme
     doxygen
     graphviz
-    texlive.combined.scheme-medium
-    fontconfig
+    texlive.combined.scheme-small
+    font-manager
   ];
 
   cmakeFlags = [
@@ -40,6 +40,9 @@ stdenv.mkDerivation {
     "-DGINKGO_BUILD_OMP=OFF"
     "-DGINKGO_BUILD_MPI=OFF"
     "-DGINKGO_BUILD_DOC=ON"
+  ];
+
+  patches = [
   ];
 
   buildPhase = ''
