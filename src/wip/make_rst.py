@@ -50,8 +50,8 @@ def stringify(expr):
             return body
         case list(l):
             return [stringify(elems) for elems in l]
-        case {"type": "reference", "name": name}:
-            return f":any:`{name}`"
+        case {"type": "reference", "name": name, "refid": id}:
+            return f":any:`{name}<{id}>`"
         case {"type": "inline_math", "code": code}:
             return f":math:`{code}`"
         case {"type": "inline_code", "code": code}:
