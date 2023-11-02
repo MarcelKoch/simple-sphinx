@@ -4,11 +4,13 @@
 , python311Packages
 , doxygen
 , masp
+, masp-xml
 , target_src ? { outPath = ./../example; }
+, pname ? "masp-sphinx-example"
 }:
 
 stdenvNoCC.mkDerivation {
-  pname = "masp-sphinx-example";
+  inherit pname;
   version = "0.0.0";
 
   src = target_src;
@@ -20,12 +22,11 @@ stdenvNoCC.mkDerivation {
     python311Packages.sphinx-rtd-theme
     doxygen
     masp
+    masp-xml
   ];
 
   buildPhase = ''
-    # C++ API generation
-    doxygen Doxyfile_cpp
-    python3 ${masp.outPath}/bin/dispatch.py > cpp_map.json
+    python3 ${masp.outPath}/bin/dispatch.py -d ${masp-xml.outPath}/xml > cpp_map.json
     # Ensure file tree exists in source
     mkdir -p source/cpp_api
     # C++ and C template generation
@@ -37,7 +38,6 @@ stdenvNoCC.mkDerivation {
     mkdir -p $out $out/rst $out/json
     mv build/html $out/html
     mv source/cpp_api $out/rst/cpp_api
-    mv doxygen/xml $out/xml
     mv cpp_map.json $out/json/
   '';
 }
