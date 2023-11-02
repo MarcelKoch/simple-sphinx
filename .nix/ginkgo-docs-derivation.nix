@@ -27,13 +27,12 @@ stdenvNoCC.mkDerivation {
   ];
 
   cmakeFlags = [
-    (lib.cmakeBool "GINKGO_BUILD_TEST" false)
-    (lib.cmakeBool "GINKGO_BUILD_REFERENCE" false)
-    (lib.cmakeBool "GINKGO_BUILD_BENCHMARKS" false)
-    (lib.cmakeBool "GINKGO_BUILD_OMP" false)
-    (lib.cmakeBool "GINKGO_BUILD_EXAMPLES" false)
-    (lib.cmakeBool "GINKGO_BUILD_MPI" false)
-    (lib.cmakeBool "GINKGO_MIXED_PRECISION" false)
+    "GINKGO_BUILD_TEST=OFF"
+    "GINKGO_BUILD_EXAMPLES=OFF"
+    "GINKGO_BUILD_BENCHMARKS=OFF"
+    "GINKGO_BUILD_REFERENCE=OFF"
+    "GINKGO_BUILD_OMP=OFF"
+    "GINKGO_BUILD_MPI=OFF"
   ];
 
   buildPhase = ''
