@@ -4,8 +4,8 @@
 
 {% macro print_relatives(relatives) %}
 {% for rel in relatives %}
-{%- if rel.id is defined %}
-{% set ref_name = ':ref:`' + rel.name + '<' + rel.id + '>`' %}{{ ref_name }}
+{%- if rel.refid is defined %}
+{% set ref_name = ':ref:`' + rel.name + '<' + rel.refid + '>`' %}{{ ref_name }}
 {% else %}
 {{ rel.name }}
 {% endif -%}
