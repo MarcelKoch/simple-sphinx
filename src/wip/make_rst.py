@@ -90,16 +90,16 @@ def main():
             stripped_name = strip_class_name_specialization(data["name"])
             stripped_id = get_class_id_by_name(stripped_name, var_map["classes"])
             data['specialization_of'] = stripped_id
-        #endif
-    #endfor
+
     for key, data in var_map["classes"].items():
         for inner_key, inner_data in var_map["classes"].items():
             if inner_data['is_special']:
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
                     data['specializations'][inner_key] = {'name':inner_data['name']}
-            #endif
-        #endfor
-    #endfor
+
+    for key, data in var_map["classes"].items():
+        for ic in data["innerclass"]:
+            var_map["classes"][ic["refid"]] |= {"is_inner": True}
 
     out_dir = Path(args.output)
     for key, data in var_map["classes"].items():
@@ -108,6 +108,7 @@ def main():
         out_name = class_name + ".rst"
         out_file = out_dir / out_name
         data["specializations"] = dict(sorted(data["specializations"].items(), key=lambda k:k[1]["name"]))
+        data["hidden"] = data.get("is_special", False) or data.get("is_inner", False)
         with open(out_file, "w") as f:
             f.write(template.render(stringify(data)))
         # endwith

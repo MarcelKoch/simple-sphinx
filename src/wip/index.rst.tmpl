@@ -7,7 +7,7 @@
 		:caption: Class Reference
 		:name: toc-class-ref
 
-{% for key,cls in classes.items() %}{% if not cls.is_special %}
+{% for key,cls in classes.items() %}{% if not cls.hidden %}
 		{{ key }}
 {% endif %}{% endfor %}
 {% endif %}
