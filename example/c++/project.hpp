@@ -9,7 +9,7 @@ class A{};
 *  Doc for B
 *
 *  with some math: \f$f(x) = 6x\f$
-*  other math \f(g(y) = 12y\f) (is not picked up by xml???)
+*  other math \f[ g(y) = 12y \f] (is not picked up by xml???)
 *  \f[
        |I_2|=\left| \int_{0}^T \psi(t)
              \left\{
@@ -47,8 +47,22 @@ public:
   *  with two paragraphs
   */
   struct inner_c{
+    /**
+	 * brief description
+	 *
+	 * Detailed desc
+	 */
     double data;
   };
+
+  /**
+   * Some sort of function
+   *
+   * Detailed text about it
+   */
+  void fusrohda(bool why){
+		(void)why;
+  }
 };
 
 /**
