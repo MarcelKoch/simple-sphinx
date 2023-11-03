@@ -7,6 +7,7 @@
 , cmake
 , texlive
 , font-manager
+, perl
 }:
 
 stdenv.mkDerivation {
@@ -28,6 +29,7 @@ stdenv.mkDerivation {
     graphviz
     texlive.combined.scheme-small
     font-manager
+    perl
   ];
 
   cmakeFlags = [
