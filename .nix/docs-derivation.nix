@@ -20,6 +20,7 @@ stdenvNoCC.mkDerivation {
     python311Packages.frozendict
     python311Packages.sphinx
     python311Packages.sphinx-rtd-theme
+    python311Packages.xmltodict
     doxygen
     masp
     masp-xml
