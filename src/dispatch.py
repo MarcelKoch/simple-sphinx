@@ -40,6 +40,8 @@ def dispatch_index(path: Path):
             return key, None
         if value is None:
             return key, None
+        if isinstance(value, str) and value.strip() == "":
+            return key, None
         # transformation based on value
         if isinstance(value, dict):
             if "sectiondef" in value:
@@ -54,6 +56,8 @@ def dispatch_index(path: Path):
             if "innernamespace" in value:
                 innernamespace = value["innernamespace"]
                 value["innernamespace"] = [ic["@refid"] for ic in innernamespace]
+            if len(value) == 1 and "#text" in value:
+                value = value["#text"]
         # transformation based on key
         if key == "ref":
             return key, {"@kind": key, **value}
@@ -80,20 +84,28 @@ def dispatch_index(path: Path):
                 style = value["@filename"][1:] + codeline[0]
                 codeline = codeline[1:]
             return key, {"@style": style, "codeline": codeline}
+        if key in ["detaileddescription", "briefdescription"]:
+            return key, value or []
         if key == "para":
             if not isinstance(value, dict):
                 value = {'#text': value}
 
-            texts = value.get('#text', "").split(cdata_sep)
+            texts = (value.get('#text', "") or "").split(cdata_sep)
 
             other_keys = set(value.keys()) - {'#text'}
+            other_keys = set(k for k in other_keys if value[k])
             interleaved = sum([as_list(value[k]) for k in other_keys], [])
-            if len(interleaved) not in [len(texts), len(texts) - 1]:
-                raise RuntimeError(f"Non matching number of interleaved segments found in para: {value}")
 
-            value = sum(([{'#text': t}, il] for t, il in zip(texts, interleaved)), [])
-            if len(texts) > len(interleaved):
-                value += [{'#text': texts[-1]}]
+            if len(interleaved) == len(texts) - 1:
+                value = sum(([{'#text': t}, il] for t, il in zip(texts, interleaved)), []) + [{'#text': texts[-1]}]
+            elif len(interleaved) == len(texts) + 1:
+                value = [interleaved[0]] + sum(([{'#text': t}, il] for t, il in zip(texts, interleaved[1:])), [])
+            elif texts == [""]:
+                value = interleaved
+            else:
+                # print(f"Non matching number of interleaved segments found in para: {value}, will put text "
+                #       f"segments before interleaved segments", file=sys.stderr)
+                value = sum(([{'#text': t}, il] for t, il in zip(texts, interleaved)), [])
             return key, value
         if key in ["parameteritem", "memberdef",
                    "detaileddescription", "briefdescription", "listofallmembers", "param",
@@ -111,6 +123,8 @@ def dispatch_index(path: Path):
                 del value["programlisting"]
             if value["@kind"] in ["class", "struct", "union"]:
                 value.setdefault("innerclass", [])
+                value.setdefault("briefdescription", [])
+                value.setdefault("detaileddescription", [])
                 value["name"] = value["compoundname"]
                 del value["compoundname"]
         return key, value
@@ -132,6 +146,7 @@ def dispatch_index(path: Path):
                                                    "templateparameterlist", "parameterlist", "derivedcompoundref",
                                                    "basecompoundref",
                                                    "para"], strip_whitespace=False,
+                                       force_cdata=True,
                                        cdata_separator=cdata_sep)["doxygen"]
             new_data = new_data["compounddef"]
         if scope == "classes":
@@ -139,9 +154,9 @@ def dispatch_index(path: Path):
         if scope == "namespaces":
             data[scope][new_data["@id"]] = new_data
         if scope == "globals":
-            innerclasses = new_data.pop('innerclass')
-            innernamespaces = new_data.pop('innernamespace')
-            sections = new_data.pop('sectiondef')
+            innerclasses = new_data.pop('innerclass', [])
+            innernamespaces = new_data.pop('innernamespace', [])
+            sections = new_data.pop('sectiondef', dict())
             stripped_sections = defaultdict(list)
             for sec_type, members in sections.items():
                 for member in members.values():
