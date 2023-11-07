@@ -53,20 +53,32 @@ def stringify(expr):
             return body
         case list(l):
             return [stringify(elems) for elems in l]
-        case {"name": name, "refid": id}:
+        case {"@id": id, **kwargs}:
+            return stringify({"id": id, **kwargs})
+        case {"@refid": id, "#text": name}:
             bracket_replacement = '\\<'
             id_str = f"<{id}>" if id else ""
-            return  f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
-        case {"type": "inline_math", "code": code}:
+            return f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
+        case {"@kind": "inline_math", "code": code}:
             return f":math:`{code}`"
-        case {"type": "inline_code", "code": code}:
+        case {"@kind": "block_math", "code": code}:
+            return {"@kind": "block_math", "code": code.splitlines()}
+        case {"@kind": "inline_code", "code": code}:
             return f":code:`{code}`"
-        case {"type": "block_code", "code": code, "style": style}:
-            return {"type": "block_code", "style": style, "code": code.splitlines()}
-        case {"type": "parameter", "name": name, "description": desc}:
+        case {"@kind": "block_code", "code": code, "style": style}:
+            return {"@kind": "block_code", "style": style, "code": code.splitlines()}
+        case {"@kind": "parameter", "name": name, "description": desc}:
             return f":param {name}: {desc}"
-        case {"type": "templateparameter", "parameter": param}:
+        case {"@kind": "templateparameter", "parameter": param}:
             return ' '.join(stringify(param))
+        case {"#text": text}:
+            return text
+        case {"para": para}:
+            lines = []
+            for p in para:
+                lines += stringify(p)
+                lines += ["\n"]
+            return lines
         case dict(d):
             return dict(
                 (key, stringify(value)) for key, value in d.items()
@@ -108,7 +120,7 @@ def main():
 
     for key, data in var_map["classes"].items():
         for ic in data["innerclass"]:
-            var_map["classes"][ic["refid"]] |= {"is_inner": True}
+            var_map["classes"][ic] |= {"is_inner": True}
 
     out_dir = Path(args.output)
     for key, data in var_map["classes"].items():
