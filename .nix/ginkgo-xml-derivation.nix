@@ -45,6 +45,7 @@ stdenv.mkDerivation {
   ];
 
   patches = [
+	  ./ginkgo-xml-doc.patch
   ];
 
   buildPhase = ''
@@ -53,6 +54,6 @@ stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out
-    mv doxygen/xml $out/xml
+    mv doc/usr/xml $out/xml
   '';
 }
