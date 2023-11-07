@@ -13,18 +13,20 @@
 
 {% macro print_desc(desc) %}
 {% for desc_line in desc %}
-{% if desc_line.type is defined %}
-{% if desc_line.type == 'block_code' %}
+{% if desc_line['@kind'] is defined %}
+{% if desc_line['@kind'] == 'block_code' %}
 
 .. code-block::
 
    {{ desc_line.code }}  
-{% elif desc_line.type == 'block_math' %}
+{% elif desc_line['@kind'] == 'block_math' %}
 
 .. math::
 
    {{ desc_line.code }}  
-{% elif desc_line.type == 'inline_math' %}
+{% elif desc_line['@kind'] == 'inline_code' %}
+::`{{ desc_line.code }}`
+{% elif desc_line['@kind'] == 'inline_math' %}
 :math:`{{ desc_line.code }}`
 {% endif %}
 {% else %}
@@ -90,7 +92,7 @@ Inner Classes
    :maxdepth: 1
 
 {% for ic in innerclass %}
-   {{ ic.refid }}
+   {{ ic }}
 {% endfor %}
 {% endif %}
 
