@@ -40,11 +40,33 @@ def dispatch_index(path: Path):
             return key, None
         if value is None:
             return key, None
+        # transformation based on value
+        if isinstance(value, dict):
+            if "sectiondef" in value:
+                sections = value["sectiondef"]
+                value["sectiondef"] = reduce(lambda r, s: r | {s["@kind"]: s["memberdef"]}, sections, dict())
+            if "memberdef" in value:
+                members = value["memberdef"]
+                value["memberdef"] = reduce(lambda r, s: r | {s["@id"]: s}, members, dict())
+            if "innerclass" in value:
+                innerclasses = value["innerclass"]
+                value["innerclass"] = [ic["@refid"] for ic in innerclasses]
+            if "innernamespace" in value:
+                innernamespace = value["innernamespace"]
+                value["innernamespace"] = [ic["@refid"] for ic in innernamespace]
         # transformation based on key
-        if key in ["ref", "formula"]:
+        if key == "ref":
             return key, {"@kind": key, **value}
+        if key == "formula":
+            code = value["#text"]
+            if code.startswith("\\[") and code.endswith("\\]"):
+                return key, {'@kind': 'block_math', "@id": value["@id"], 'code': code.strip("\[] ")}
+            elif code.startswith("$") and code.endswith("$"):
+                return key, {'@kind': 'inline_math', "@id": value["@id"], 'code': code.strip("$ ")}
+            else:
+                raise AssertionError(f"Unrecognized math formula: {code}")
         if key == "computeroutput":
-            return {"@kind": key, "#text": value}
+            return key, {"@kind": 'inline_code', "code": value}
         if key == "codeline":
             return key, " ".join([(cl or "").strip() for cl in as_list(value["highlight"])])
         if key == "highlight":
@@ -73,49 +95,42 @@ def dispatch_index(path: Path):
             if len(texts) > len(interleaved):
                 value += [{'#text': texts[-1]}]
             return key, value
-        if key in ["parameteritem", "compounddef", "memberdef",
+        if key in ["parameteritem", "memberdef",
                    "detaileddescription", "briefdescription", "listofallmembers", "param",
                    "templateparamlist"]:
             if isinstance(value, dict) and "#text" in value:
                 del value["#text"]
+            return key, value
         if key in ["parameternamelist", "parameterdescription"]:
             del value["#text"]
             value = {list(value.keys())[0]: list(value.values())[0]}
             return key, value
         if key == "compounddef":
+            del value["#text"]
             if value["@kind"] == "file":
                 del value["programlisting"]
-        # transformation based on value
-        if isinstance(value, dict):
-            if "sectiondef" in value:
-                sections = value["sectiondef"]
-                value["sectiondef"] = reduce(lambda r, s: r | {s["@kind"]: s["memberdef"]}, sections, dict())
-            if "memberdef" in value:
-                members = value["memberdef"]
-                value["memberdef"] = reduce(lambda r, s: r | {s["@id"]: s}, members, dict())
-            if "innerclass" in value:
-                innerclasses = value["innerclass"]
-                value["innerclass"] = [ic["@refid"] for ic in innerclasses]
-            if "innernamespace" in value:
-                innernamespace = value["innernamespace"]
-                value["innernamespace"] = [ic["@refid"] for ic in innernamespace]
+            if value["@kind"] in ["class", "struct", "union"]:
+                value.setdefault("innerclass", [])
+                value["name"] = value["compoundname"]
+                del value["compoundname"]
         return key, value
 
     with open(path / "index.xml") as input:
         index = xmltodict.parse(input.read())["doxygenindex"]
 
-    map_kind = {"class": "classes", "struct": "classes", "union": "classes",
+    map_scope = {"class": "classes", "struct": "classes", "union": "classes",
                 "namespace": "namespaces", "file": "globals"}
     for compound in index["compound"]:
         try:
-            scope = map_kind[compound['@kind']]
+            scope = map_scope[compound['@kind']]
         except KeyError:
             continue
 
         with open(path / f"{compound['@refid']}.xml") as input:
             new_data = xmltodict.parse(input.read(), postprocessor=post_process,
                                        force_list=["sectiondef", "memberdef", "innerclass", "innernamespace", "param",
-                                                   "templateparameterlist", "parameterlist",
+                                                   "templateparameterlist", "parameterlist", "derivedcompoundref",
+                                                   "basecompoundref",
                                                    "para"], strip_whitespace=False,
                                        cdata_separator=cdata_sep)["doxygen"]
             new_data = new_data["compounddef"]
