@@ -1,76 +1,56 @@
 from collections import defaultdict
 
-import sys
 import argparse
 from dataclasses import dataclass
-from functools import singledispatch
+from enum import Enum, auto
+from functools import singledispatch, reduce
 import xml.dom.minidom as MD
 from pathlib import Path
 import json
-from frozendict import frozendict
+from typing import Any
 
 gko_directory = "../../ginkgo/document-create-functions/doc/doxygen/xml"
 simple_directory = "doxygen/xml"
 
 
-def constructor(self, payload):
-    self.payload = payload
+enum_types = set()
 
 
-def create_class(name):
-    return f"xml_{name}", type(f"xml_{name}", (object,), {"name": name,
-                                                          "__init__": constructor})
+class UniqueEnumType(Enum):
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any:
+        new_type = type(name, (object,), dict())
+        enum_types.add(new_type)
+        return new_type
 
 
-classes = dict(create_class(name) for name in [
-    "compounddef",
-    "compoundname",
-    "basecompoundref",
-    "derivedcompoundref",
-    "briefdescription",
-    "detaileddescription",
-    "sectiondef",
-    "memberdef",
-    "templateparamlist",
-    "para",
-    "ref",
-    "computeroutput",
-    "sp",
-    "programlisting",
-    "highlight",
-    "codeline",
-    "type",
-    "definition",
-    "name",
-    "qualifiedname",
-    "argsstring",
-    "location",
-    "innerclass",
-    "innernamespace",
-    "initializer",
-    "formula",
-    "simplesect",
-    "parameterlist",
-    "parametername",
-    "itemizedlist",
-    "orderedlist",
-    "bold",
-    "emphasis",
-    "ulink",
-    "ndash",
-    "enumvalue",
-    "templateparameterlist",
-    "blockquote",
-    "heading",
-    # compounddef kinds
-    "class",
-    "struct",
-    "union",
-    "namespace",
-    "group",
-    "dir",
-    "file"
-])
+class xml_tag(UniqueEnumType):
+    """XML tags which have a non-default dispatch
+
+    The tag defined here are one-to-one mappings of the `kind` attribute
+    of the xml Element node. The different `kind`s represent different
+    doxygen parts. The ones defined here need special treatment.
+    """
+
+    COMPOUNDDEF = auto()
+    DETAILEDDESCRIPTION = auto()
+    BRIEFDESCRIPTION = auto()
+    MEMBERDEF = auto()
+    NAME = auto()
+    PARA = auto()
+    PARAMETERDESCRIPTION = auto()
+    PARAMETERITEM = auto()
+    PARAMETERLIST = auto()
+    PARAM = auto()
+    SECTIONDEF = auto()
+    TEMPLATEPARAMLIST = auto()
+    TYPE = auto()
+
+
+def as_list(v):
+    if isinstance(v, list):
+        return v
+    else:
+        return [v]
 
 
 @singledispatch
@@ -78,400 +58,117 @@ def dispatch(expr, ctx):
     raise AssertionError(f"Unhandled type {type(expr)}")
 
 
-@dispatch.register
-def dispatch_(expr: list, ctx):
-    if len(expr) > 1:
-        raise AssertionError(f"Node list has to have length of 1. Please handle iteration at caller site")
-    if len(expr) == 0:
-        return []
-    else:
-        return dispatch(expr[0], ctx)
-
-
-@dispatch.register
-def dispatch_(expr: MD.Element, ctx):
-    return dispatch(classes[f"xml_{expr.tagName}"](expr), ctx)
-
-
-def getElementsByTagName(node: MD.Element | MD.Document, tag):
-    # This function is not recursive compared to Element.getElementsByTagName
-    elements = []
-    for child in node.childNodes:
-        if isinstance(child, MD.Element) and child.tagName == tag:
-            elements.append(child)
-    return elements
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_group'] | classes["xml_dir"], ctx):
-    # print(f"Warning: encountered {expr.payload.attributes['kind'].value} documentation. This will be skipped!",
-    #       file=sys.stderr)
-    return None
-
-
-@dispatch.register
-def dispatch_(expr: classes["xml_class"] | classes["xml_struct"] | classes["xml_union"], ctx):
-    # Find the class id ( used for files/html/etc )
-    payload = expr.payload
-    name = dispatch(getElementsByTagName(payload, 'compoundname'), ctx)
-    data = {
-        'type': payload.attributes['kind'].value,
-        'id': payload.attributes['id'].value,
-        'prot': payload.attributes['prot'].value,
-        'name': name,
-        'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
-        'basecompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'basecompoundref')],
-        'derivedcompoundref': [dispatch(d, ctx) for d in getElementsByTagName(payload, 'derivedcompoundref')],
-        'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
-        'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        'sectiondef': dict(dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef')),
-        'innerclass': [dispatch(ic, ctx) for ic in getElementsByTagName(payload, 'innerclass')],
-    }
-    return data
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_compounddef'], ctx):
-    kind = expr.payload.attributes['kind'].value
-    return dispatch(classes[f"xml_{kind}"](expr.payload), ctx)
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_compoundname'], ctx):
-    return dispatch(expr.payload.childNodes[0], ctx)
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_basecompoundref'] | classes['xml_derivedcompoundref'], ctx):
-    base_data = {"name": dispatch(expr.payload.childNodes[0], ctx)}
-    if "refid" in expr.payload.attributes:
-        return {"refid": expr.payload.attributes["refid"].value, **base_data}
-    else:
-        return {"refid": None, **base_data}
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_briefdescription'] | classes['xml_detaileddescription'], ctx):
-    para = getElementsByTagName(expr.payload, 'para')
-    if para:
-        return sum([dispatch(p, ctx) for p in para], start=[])
-    else:
-        return [""]
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_sectiondef'], ctx):
-    return expr.payload.attributes['kind'].value, dict(dispatch(member, ctx) for member in
-                                                       getElementsByTagName(expr.payload, "memberdef"))
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_memberdef'], ctx):
-    payload = expr.payload
-    kind = payload.attributes["kind"].value
-    base_data = {
-        'type': 'member',
-        **dict(payload.attributes.items()),
-        'name': dispatch(getElementsByTagName(payload, 'name'), ctx),
-        'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
-        'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        # ignore inbodydescription since that doesn't exist in C++
-        'location': dispatch(getElementsByTagName(payload, 'location'), ctx)
-    }
-
-    if kind == 'variable':
-        initializer = getElementsByTagName(payload, 'initializer')
-        data = {
-            **base_data,
-            'definition': dispatch(getElementsByTagName(payload, 'definition'), ctx),
-            'initializer': dispatch(initializer, ctx) if initializer else "",
-        }
-    elif kind == 'function':
-        data = {
-            **base_data,
-            'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx),
-            'definition': dispatch(getElementsByTagName(payload, 'definition'), ctx),
-            'return_type': dispatch(getElementsByTagName(payload, 'type'), ctx),
-            'argsstring': dispatch(getElementsByTagName(payload, 'argsstring'), ctx),
-        }
-    elif kind == 'enum':
-        data = {
-            **base_data,
-            # @todo: need qualified name?
-            'items': [dispatch(item, ctx) for item in getElementsByTagName(payload, 'enumvalue')]
-        }
-    elif kind == 'typedef':
-        data = {
-            **base_data,
-            'base_type': dispatch(getElementsByTagName(payload, 'type'), ctx),
-            'templateparameters': dispatch(getElementsByTagName(payload, 'templateparamlist'), ctx)
-        }
-    elif kind == 'friend':
-        data = {
-            **base_data,
-            'name': f"{dispatch(getElementsByTagName(payload, 'type'), ctx)} {base_data['name']}"
-        }
-    elif kind == 'define':  # macros
-        data = base_data
-    else:
-        raise AssertionError(f"Encountered unexpected member kind: {kind}")
-    return data['id'], data
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_namespace'] | classes['xml_file'], ctx):
-    payload = expr.payload
-    data = {
-        'type': payload.attributes['kind'].value,
-        'id': payload.attributes['id'].value,
-        'name': dispatch(getElementsByTagName(payload, 'compoundname'), ctx),
-        'innerclass': [dispatch(ic, ctx) for ic in getElementsByTagName(payload, 'innerclass')],
-        'innernamespace': [dispatch(nn, ctx) for nn in getElementsByTagName(payload, 'innernamespace')],
-        'briefdescription': dispatch(getElementsByTagName(payload, 'briefdescription'), ctx),
-        'detaileddescription': dispatch(getElementsByTagName(payload, 'detaileddescription'), ctx),
-        'sectiondef': dict(dispatch(sec, ctx) for sec in getElementsByTagName(payload, 'sectiondef'))
-    }
-    return data
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_innerclass'] | classes['xml_innernamespace'], ctx):
-    return {
-        **dict(expr.payload.attributes.items()),
-        'name': dispatch(expr.payload.childNodes[0], ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_templateparamlist'], ctx):
-    def dispatch_item(item):
-        _type = dispatch(getElementsByTagName(item, 'type'), ctx)
-        if declname := getElementsByTagName(item, 'declname'):
-            defname = getElementsByTagName(item, 'defname')
-            if dispatch(declname[0].childNodes[0], ctx) != dispatch(defname[0].childNodes[0], ctx):
-                raise AssertionError(
-                    f"Can't handle mismatched declaration and definition names: {declname}, {defname}.")
-            _type.append(dispatch(declname[0].childNodes, ctx))
-        return {"parameter": _type}
-
-    return [
-        {"type": "templateparameter", **dispatch_item(item)} for item in getElementsByTagName(expr.payload, 'param')
-    ]
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_enumvalue'], ctx):
-    return {
-        'type': 'enumvalue',
-        'name': dispatch(getElementsByTagName(expr.payload, 'name'), ctx),
-        'briefdescription': dispatch(getElementsByTagName(expr.payload, 'briefdescription'), ctx),
-        'detaileddescription': dispatch(getElementsByTagName(expr.payload, 'detaileddescription'), ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_name'] | classes['xml_qualifiedname'] | classes['xml_definition'] | classes[
-    'xml_parametername'], ctx):
-    return dispatch(expr.payload.childNodes[0], ctx)
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_type'], ctx):
-    if children := expr.payload.childNodes:
-        return [dispatch(child, ctx) for child in children]
-    else:
-        return ["void"]
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_argsstring'] | classes['xml_initializer'], ctx):
-    if expr.payload.childNodes:
-        return dispatch(expr.payload.childNodes[0], ctx)
-    else:
-        return ""
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_location'], ctx):
-    return {
-        'type': 'location',
-        **dict(expr.payload.attributes.items())
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_para'], ctx):
-    data = []
-    for child in expr.payload.childNodes:
-        child_data = dispatch(child, ctx)
-        if isinstance(child_data, str):
-            child_data = child_data.strip()
-        if child_data:
-            data.append(child_data)
-    return data
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_bold'] | classes["xml_emphasis"], ctx):
-    return {
-        'type': 'markup',
-        'kind': expr.payload.tagName,
-        'body': dispatch(expr.payload.childNodes[0], ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_ndash'], ctx):
-    return "--"
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_ulink'], ctx):
-    return {
-        'type': 'hyperlink',
-        'url': expr.payload.attributes["url"].value,
-        'body': dispatch(expr.payload.childNodes[0], ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_itemizedlist'] | classes["xml_orderedlist"], ctx):
-    return {
-        'type': expr.payload.tagName,
-        'items': [dispatch(getElementsByTagName(item, 'para'), ctx) for item in
-                  getElementsByTagName(expr.payload, "listitem")]
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_ref'], ctx):
-    return {
-        'type': 'reference',
-        'name': dispatch(expr.payload.childNodes[0], ctx),
-        'refid': expr.payload.attributes['refid'].value
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_simplesect'], ctx):
-    return {
-        'type': 'simplesect',
-        'kind': expr.payload.attributes['kind'].value,
-        'body': dispatch(expr.payload.childNodes[0], ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_parameterlist'], ctx):
-    def dispatch_item(item):
-        return {
-            'type': 'parameter',
-            'name': dispatch(getElementsByTagName(getElementsByTagName(item, 'parameternamelist')[0],
-                                                  'parametername'), ctx),
-            'description': dispatch(getElementsByTagName(getElementsByTagName(item, 'parameterdescription')[0],
-                                                         'para'), ctx),
-        }
-
-    return [
-        dispatch_item(item) for item in getElementsByTagName(expr.payload, 'parameteritem')
-    ]
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_computeroutput'], ctx):
-    return {
-        'type': 'inline_code',
-        'code': dispatch(expr.payload.childNodes[0], ctx)
-    }
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_sp'], ctx):
-    return " "
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_programlisting'], ctx):
-    first_cl = getElementsByTagName(expr.payload, 'codeline')[0]
-    if first_cl is None:
-        style = 'text'
-        start_idx = 0
-    else:
-        style = dispatch(first_cl, ctx).strip(" {}")
-        start_idx = 1
-
-    return {'type': 'block_code',
-            'style': style,
-            'code': "\n".join(dispatch(cl, ctx) for cl in getElementsByTagName(expr.payload, 'codeline')[start_idx:])}
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_highlight'], ctx):
-    # @todo: maybe handle highlighting?
-    def sanitize(fragment):
-        # let sphinx handle references
-        match fragment:
-            case {"name": name}:
-                return name
-            case str(body):
-                return body
-            case _:
-                raise AssertionError(f"Can't reduce fragment to str: {fragment}")
-
-    return "".join(
-        sanitize(dispatch(child, ctx)) for child in expr.payload.childNodes
-    )
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_codeline'], ctx):
-    return "".join(
-        dispatch(child, ctx) for child in expr.payload.childNodes
-    )
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_formula'], ctx):
-    code = expr.payload.childNodes[0].data
-    if code.startswith("\\[") and code.endswith("\\]"):
-        return {
-            'type': 'block_math',
-            'code': code.strip("\[] ")
-        }
-    elif code.startswith("$") and code.endswith("$"):
-        return {
-            'type': 'inline_math',
-            'code': code.strip("$ ")
-        }
-    else:
-        raise AssertionError(f"Unrecognized math formula: {code}")
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_blockquote'], ctx):
-    return {"type": "blockquote",
-            "content": [dispatch(c, ctx) for c in expr.payload.childNodes]}
-
-
-@dispatch.register
-def dispatch_(expr: classes['xml_heading'], ctx):
-    return {
-        "type": "heading",
-        "level": expr.payload.attributes["level"].value,
-        "text": [dispatch(c, ctx) for c in expr.payload.childNodes]
-    }
-
-
-
-@dispatch.register
-def dispatch_(expr: MD.Text, ctx):
-    stripped_text = expr.data.strip()
-    return stripped_text
+@singledispatch
+def dispatch_tag(tag, expr, ctx):
+    raise AssertionError(f"Unhandled tag {tag}")
 
 
 @dispatch.register
 def dispatch_(expr: MD.Document, ctx):
-    return dispatch(getElementsByTagName(getElementsByTagName(expr, "doxygen")[0], "compounddef"), ctx)
+    return dispatch(expr.getElementsByTagName("doxygen")[0], ctx)
+
+
+def dispatch_default(expr: MD.Element, ctx):
+    def merge(a: dict, b: dict):
+        common_keys = set(a.keys()) & set(b.keys())
+        unique_kwargs = [(k, a[k]) for k in set(a.keys()) - common_keys] + [(k, b[k]) for k in
+                                                                            set(b.keys()) - common_keys]
+        shared_kwargs = [(k, as_list(a[k]) + as_list(b[k])) for k in common_keys]
+        return dict(unique_kwargs + shared_kwargs)
+
+    attribs = {f"@{k}": v for k, v in expr.attributes.items()}
+    data = {expr.tagName: reduce(lambda r, c: merge(r, dispatch(c, ctx)), expr.childNodes, attribs)}
+    return data
+
+
+@dispatch.register
+def dispatch_(expr: MD.Element, ctx):
+    try:
+        tag = xml_tag[expr.tagName.upper()].value()
+    except KeyError:
+        data = dispatch_default(expr, ctx)
+    else:
+        data = dispatch_tag(tag, expr, ctx)
+
+    return data
+
+
+@dispatch.register
+def dispatch_(expr: MD.Text, ctx):
+    return {"#text": expr.data}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.PARA.value, expr: MD.Element, ctx):
+    return {"para": [dispatch(c, ctx) for c in expr.childNodes]}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.COMPOUNDDEF.value, expr: MD.Element,
+                  ctx):
+    data = dispatch_default(expr, ctx)[expr.tagName]
+    data["name"] = data["compoundname"]["#text"]
+    sections = as_list(data.get("sectiondef", [dict()]))
+    data["sectiondef"] = reduce(lambda r, d: r | d, sections, dict())
+    data["innerclass"] = as_list(data.get("innerclass", []))
+    for key in ["#text", "inheritancegraph", "collaborationgraph", "compoundname"]:
+        if key in data:
+            del data[key]
+    return {expr.tagName: data}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.MEMBERDEF.value | xml_tag.PARAM.value | xml_tag.TEMPLATEPARAMLIST.value |
+                       xml_tag.PARAMETERLIST.value, expr: MD.Element,
+                  ctx):
+    data = dispatch_default(expr, ctx)
+    if "#text" in data[expr.tagName]:
+        del data[expr.tagName]["#text"]
+    return data
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.SECTIONDEF.value, expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    section_data = defaultdict(dict)
+    for sec in as_list(data["sectiondef"]):
+        kind = sec["@kind"]
+        for member in as_list(sec["memberdef"]):
+            section_data[kind][member["@id"]] = member
+    return {"sectiondef": section_data}
+
+
+@dispatch_tag.register
+def dispatch_tag_(
+        tag: xml_tag.DETAILEDDESCRIPTION.value | xml_tag.BRIEFDESCRIPTION.value | xml_tag.PARAMETERDESCRIPTION.value,
+        expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    para = data[expr.tagName].get("para", [[]])
+    if len(para) == 0:
+        para = [[]]
+    if len(para) > 0 and not all(isinstance(l, list) for l in para):
+        para = [para]
+    return {expr.tagName: para}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.TYPE.value, expr: MD.Element, ctx):
+    if children := expr.childNodes:
+        return {"type": dispatch(child, ctx) for child in children}
+    else:
+        return {"type": {"#text": "void"}}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.PARAMETERITEM.value, expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    item = data[expr.tagName]
+    return {expr.tagName: {"parametername": item["parameternamelist"]["parametername"],
+                           "parameterdescription": item["parameterdescription"]}}
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.NAME.value, expr: MD.Element, ctx):
+    return {expr.tagName: expr.childNodes[0].data}
 
 
 def dispatch_index(expr: MD.Document, ctx):
@@ -481,38 +178,44 @@ def dispatch_index(expr: MD.Document, ctx):
         globals=dict(sectiondef=dict())
     )
 
-    index = getElementsByTagName(expr, 'doxygenindex')[0]
+    index = expr.getElementsByTagName('doxygenindex')[0]
 
     map_kind = {"class": "classes", "struct": "classes", "union": "classes",
                 "namespace": "namespaces", "file": "globals"}
-    for compoud in getElementsByTagName(index, 'compound'):
+    for compoud in index.getElementsByTagName('compound'):
         file = f"{ctx.directory}/{compoud.attributes['refid'].value}.xml"
         kind = compoud.attributes['kind'].value
-        new_data = dispatch(MD.parse(file), ctx)
+
+        try:
+            scope = map_kind[kind]
+        except KeyError:
+            continue
+
+        new_data = dispatch(MD.parse(file), ctx)["doxygen"]["compounddef"]
         if new_data and kind != "file":
-            data[map_kind[kind]][new_data["id"]] = new_data
+            data[scope][new_data["@id"]] = new_data
         if new_data and kind == "file":
-            innerclasses = new_data.pop('innerclass')
-            innernamespaces = new_data.pop('innernamespace')
-            sections = new_data.pop('sectiondef')
+            innerclasses = new_data.pop('innerclass', [])
+            innernamespaces = new_data.pop('innernamespace', [])
+            sections = new_data.pop('sectiondef', dict())
             stripped_sections = defaultdict(list)
-            for sec_type, members in sections.items():
-                for member in members.values():
-                    stripped_sections[sec_type].append({
-                        'refid': member['id'],
-                        'prot': member['prot'],
+            for kind, sec in sections.items():
+                for member in sec.values():
+                    stripped_sections[kind].append({
+                        '@refid': member['@id'],
+                        '@prot': member['@prot'],
                         'name': member['name']
                     })
 
-            data[map_kind[kind]][new_data["id"]] = {**new_data, 'contains': {
+            data[scope][new_data["@id"]] = {**new_data, 'contains': {
                 'classes': innerclasses,
                 'namespaces': innernamespaces,
                 **stripped_sections
             }}
 
-            for sec_type, members in sections.items():
-                for member_id, member in members.items():
-                    data[map_kind[kind]]['sectiondef'].setdefault(sec_type, dict())[member_id] = member
+            for kind, sec in sections.items():
+                for member in sec.values():
+                    data[scope]['sectiondef'].setdefault(kind, dict())[member["@id"]] = member
 
     return data
 
@@ -544,48 +247,3 @@ dom = MD.parse(str(index.resolve()))
 parsed = dispatch_index(dom, Context(directory=xml_directory))
 
 print(json.dumps(parsed, indent=2))
-
-
-def compute_extra_data(data):
-    specializations = defaultdict(set)
-    specialization_of = defaultdict(dict)
-    enclosing_class = defaultdict(lambda: None)
-    name_to_id = defaultdict(set)
-
-    def build_name_to_id(_data):
-        match _data:
-            case {"id": id, "name": name, **kwargs}:
-                name_to_id[name].add(id)
-                build_name_to_id(kwargs)
-            case list(l):
-                for v in l:
-                    build_name_to_id(v)
-            case dict(kwargs):
-                for v in kwargs.values():
-                    build_name_to_id(v)
-            case _:
-                pass
-
-    build_name_to_id(data)
-
-    def remove_specialization(name):
-        return name.partition('<')[0]
-
-    def maybe_add_specialization(cl_id, cl):
-        name = cl["name"]
-        trimmed_name = remove_specialization(name)
-        if name != trimmed_name and trimmed_name in name_to_id:
-            specializations[name_to_id[trimmed_name]].add(cl_id)
-            specialization_of[name_to_id[name]], _ = name_to_id[trimmed_name]
-
-    for cl_id, cl in data['classes'].items():
-        maybe_add_specialization(cl_id, cl)
-
-    for ic in cl["innerclass"]:
-        enclosing_class[ic["refid"]] = cl_id
-
-    return name_to_id, specializations, specialization_of, enclosing_class
-
-
-# ctx = compute_extra_data(parsed)
-pass
