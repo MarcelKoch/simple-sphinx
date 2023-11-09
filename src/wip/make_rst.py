@@ -71,14 +71,14 @@ def stringify(expr):
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
             return ' '.join(stringify(param))
-        case {"#text": text}:
-            return text
         case {"para": para}:
             lines = []
             for p in para:
                 lines += stringify(p)
                 lines += ["\n"]
             return lines
+        case {"#text": text}:
+            return text
         case dict(d):
             return dict(
                 (key, stringify(value)) for key, value in d.items()
