@@ -59,14 +59,21 @@ def stringify(expr):
             bracket_replacement = '\\<'
             id_str = f"<{id}>" if id else ""
             return f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
-        case {"@kind": "inline_math", "code": code}:
-            return f":math:`{code}`"
-        case {"@kind": "block_math", "code": code}:
-            return {"@kind": "block_math", "code": code.splitlines()}
-        case {"@kind": "inline_code", "code": code}:
+        case {"formula": {"#text": code}}:
+            if code.startswith("\["):
+                if not code.endswith("\]"):
+                    raise RuntimeError(f"Can't handle math element: {code}")
+                code = code.strip("\[]")
+                return {"@kind": "block_math", "code": code}
+            else:
+                code = code.strip("$")
+                return f":math:`{code}`"
+        case {"computeroutput": {"#text": code}}:
             return f":code:`{code}`"
-        case {"@kind": "block_code", "code": code, "style": style}:
-            return {"@kind": "block_code", "style": style, "code": code.splitlines()}
+        case {"codeline": code}:
+            return stringify(code)
+        case {"programlisting": {"style": style, "code": code}}:
+            return {"@kind": "block_code", "style": style, "code": stringify(code)}
         case {"@kind": "parameter", "name": name, "description": desc}:
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
