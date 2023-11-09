@@ -1,9 +1,10 @@
 --- ginkgo/doc/conf/Doxyfile-usr.in	2023-09-22 12:51:20.191390237 +0200
-+++ patched/doc/conf/Doxyfile-usr.in	2023-11-07 12:40:54.352149645 +0100
-@@ -1,4 +1,5 @@
++++ patched/doc/conf/Doxyfile-usr.in	2023-11-09 15:14:02.221111704 +0100
+@@ -1,4 +1,6 @@
 -GENERATE_HTML          = YES
 +GENERATE_XML          = YES
 +GENERATE_HTML         = NO
++EXTRACT_ALL           = YES
  
  # this is used to hide protected members
  PREDEFINED = @default_predefined_macros@ protected=private
