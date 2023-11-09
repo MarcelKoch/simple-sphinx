@@ -55,7 +55,7 @@ def stringify(expr):
             return [stringify(elems) for elems in l]
         case {"@id": id, **kwargs}:
             return stringify({"id": id, **kwargs})
-        case {"@refid": id, "#text": name}:
+        case {"ref": {"@refid": id, "#text": name}}:
             bracket_replacement = '\\<'
             id_str = f"<{id}>" if id else ""
             return f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
