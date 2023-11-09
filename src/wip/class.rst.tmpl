@@ -3,44 +3,51 @@
 .. _{{ id }}:
 
 {% macro print_relatives(relatives) %}
+{% if relatives|length == 0 %}
+None
+{% else %}
+
 {% for rel in relatives %}
 {{ rel }}
-{%- if not loop.last %},
-{% endif -%}
 {% endfor %}
-{% if relatives|length == 0 %}None{% endif %}
+{% endif %}
 {% endmacro %}
 
-{% macro print_desc(desc) %}
-{% for desc_line in desc %}
-{% if desc_line['@kind'] is defined %}
-{% if desc_line['@kind'] == 'block_code' %}
+{% macro print_paragraph(para, level=0, keep_indent=False) %}
+{% filter indent(level * 3, first=True) %}
+{% for line in para %}
+   {% if line["@directive"] is defined %}
 
-.. code-block::
+.. {{ line["@directive"] }}:: {{ line.get("@opts", "") }}
 
-   {% for cl in desc_line.code %}
-   {{ cl }}
-   {% endfor %}
 
-{% elif desc_line['@kind'] == 'block_math' %}
+{{ print_paragraph(line["lines"], level + 1, True) }}
 
-.. math::
-
-   {{ desc_line.code }}
-
-{% elif desc_line['@kind'] == 'inline_code' %}
-::`{{ desc_line.code }}`
-{% elif desc_line['@kind'] == 'inline_math' %}
-:math:`{{ desc_line.code }}`
-{% endif %}
-{% else %}
-{{ desc_line.strip() }}
-{% endif %}
+   {% elif line["@role"] is defined %}
+   
+:{{ line["@role"] }}: {{ line["lines"] }}
+   {% else %}
+      {% if keep_indent %}
+{{ line }}
+      {% else %}
+{{ line.strip() }}
+      {% endif %}
+   {% endif %}
 {% endfor %}
-{% endmacro -%}
+{% endfilter %}
+{% endmacro %}
+
+{% macro print_desc(desc, level=0) %}
+{% for para in desc %}
+{{ print_paragraph(para, level)}}
+
+{% endfor %}
+{% endmacro %}
 
 {{ name }}
 {% for i in name %}={% endfor %}
+
+.. cpp:namespace:: {{ name }}
 
 {% if templateparameters|length > 0 %}
 Template Arguments
@@ -100,121 +107,33 @@ Inner Classes
 {% endfor %}
 {% endif %}
 
-{% if sectiondef|map(attribute="type")|select("equalto", "public-attrib")|map(attribute="members")|list|length > 0 %}
-.. rst-class:: classref-reftable-group
-
-Vars
-----
-
-{% for sec in sectiondef %}
-{% if sec.type == "public-attrib" %}
-{% for attrib in sec.members %}
-.. cpp:member:: 		
-{%- if attrib.static %} static {% endif %}
-{% if attrib.mutable %} mutable {% endif %}
-{{ attrib.definition }}{{ attrib.initializer }}
-{{ print_desc(attrib.briefdescription) }}
-{{ print_desc(attrib.detaileddescription) }}
-{% endfor %}
-{% endif %}
-{% endfor %}
-{% endif %}
-
-{% if functions|length > 0 %}
+{% if sectiondef["public-func"]|length > 0 or sectiondef["protected-func"]|length > 0 %}
 .. rst-class:: classref-reftable-group
 
 Methods
 -------
 
-{% set ref_name_lens = [] %}
-{% set ref_type_lens = [] %}
-{% for fid,func in functions.items() %}
-{% set ref_name = ':ref:`'+func.name + '<' + func.id + '>`' %}{{ func.update({"ref_name":ref_name}) or "" }}
-{% set ref_func_tuple = [] %}
-{% set ref_type_tuple = [] %}
-{% for type_ele in func.type %}
-{% if type_ele is string %}{{ ref_type_tuple.append(type_ele|replace("*","\*")) or "" }}
-{% else %}
-{% set ele_ref_type = ':ref:`'+ type_ele.name + '<' + type_ele.id + '>`' %}{{ ref_type_tuple.append(ele_ref_type|replace("*","\*")) or "" }}{% endif %}
+
+{% for id, func in sectiondef["public-func"].items() %}
+.. _{{ id }}:
+.. cpp:function:: {{ 'static ' if func["@static"] == "yes" else "" }}{{ 'virtual ' if func["@virt"] == "virtual" else "" }}{{ 'explicit ' if func["@explicit"] == "yes" else "" }} {{ func.definition }}{{ func.argsstring }} {{ "const" if func["@const"] == "yes" else "" }}
+
+{{ print_desc(func.briefdescription, level=1) }}
+{{ print_desc(func.detaileddescription, level=1) }}
 {% endfor %}
-{% set ref_type = " ".join(ref_type_tuple) %}{{ ref_type_lens.append(ref_type|length) or "" }}{{ func.update({"ref_type":ref_type}) or "" }}
-{% for param in func.parameters %}
-{% set ref_param_type_tuple = [] %}
-{% for param_type_ele in param.type %}
-{% if param_type_ele is string %}{{ ref_param_type_tuple.append(param_type_ele|replace("*","\*")) or "" }}
-{% else %}
-{% set ele_param_ref_type = ':ref:`'+ param_type_ele.name + '<' + param_type_ele.id + '>`' %}{{ ref_param_type_tuple.append(ele_param_ref_type|replace("*","\*")) or "" }}{% endif %}
-{% endfor %}
-{% set param_ref_type = " ".join(ref_param_type_tuple) %}{{ param.update({"ref_type":param_ref_type }) or "" }}{{ ref_func_tuple.append(param_ref_type|replace("*","\*")) or "" }}
-{% endfor %}
-{% set ref_func_param = ", ".join(ref_func_tuple) %}
-{% set ref_func = ref_name + " **(** " + ref_func_param + " **)**" %}{{ ref_name_lens.append(ref_func|length) or "" }}{{ func.update({"ref_func":ref_func}) or "" }}
-{% endfor %}
-{% set str_type_max_len = ref_type_lens|max %}
-{% set str_name_max_len = ref_name_lens|max %}
-{% for fid,func in functions.items() %}
-+-{% for i in range(str_type_max_len) %}-{% endfor %}-+-{% for i in range(str_name_max_len) %}-{% endfor %}-+
-+ {{ "{0}".format(func.ref_type).ljust(str_type_max_len) }} | {{ "{0}".format(func.ref_func).ljust(str_name_max_len) }} |
-{% endfor %}
-{% if functions|length > 0 %}
-+-{% for i in range(str_type_max_len) %}-{% endfor %}-+-{% for i in range(str_name_max_len) %}-{% endfor %}-+
-{% endif %}
 {% endif %}
 
-{% if attributes|length > 0 %}
-.. rst-class:: classref-section-separator
+{% if sectiondef["public-attrib"]|length > 0 %}
+.. rst-class:: classref-reftable-group
 
+Vars
 ----
 
-Vars Description
-----------------
+{% for id, attrib in sectiondef["public-attrib"].items() %}
+.. _{{ id }}:
+.. cpp:member:: {{ 'static ' if attrib["@static"] == "yes" else ""}}{{ 'mutable ' if attrib["@mutable"] == "yes" else ""}}{{ attrib.definition }}{{ attrib.initializer }}
 
-{% for aid,vars in attributes.items() %}
-.. _{{ vars.id }}:
-{{ vars.ref_type }}{% if vars.ref_type|length > 0 %} {% endif %}{{ vars.ref_name }}
-{% for desc_type in vars.detaileddescription %}
-{% set desc_type_tuple = [] %}
-{% for ele in desc_type %}
-{% if ele is string %}{{ desc_type_tuple.append(ele|replace("*","\*")) or "" }}
-{% else %}
-{% set ele_ref = ':ref:`' + ele.name + '<' + ele.id + '>`' %}{{ desc_type_tuple.append(ele_ref|replace("*","\*")) or "" }}{% endif %}
-{% endfor %}
-{% set desc = " ".join(desc_type_tuple) %}
-| {{ desc }}
-{% endfor %}
-{% if not loop.last %}
-.. rst-class:: classref-item-separator
-
-----
-{% endif %}
-{% endfor %}
-{% endif %}
-
-{% if functions|length > 0 %}
-.. rst-class:: classref-section-separator
-
-----
-
-Methods Description
--------------------
-
-{% for fid,func in functions.items() %}
-.. _{{ func.id }}:
-{{ func.ref_type }}{% if func.ref_type|length > 0 %} {% endif %}{{ func.ref_func }}
-{% for desc_type in func.detaileddescription %}
-{% set desc_type_tuple = [] %}
-{% for ele in desc_type %}
-{% if ele is string %}{{ desc_type_tuple.append(ele|replace("*","\*")) or "" }}
-{% else %}
-{% set ele_ref = ':ref:`' + ele.name + '<' + ele.id + '>`' %}{{ desc_type_tuple.append(ele_ref|replace("*","\*")) or "" }}{% endif %}
-{% endfor %}
-{% set desc = " ".join(desc_type_tuple) %}
-| {{ desc }}
-{% endfor %}
-{% if not loop.last %}
-.. rst-class:: classref-item-separator
-
-----
-{% endif %}
+{{ print_desc(attrib.briefdescription, level=1) }}
+{{ print_desc(attrib.detaileddescription, level=1) }}
 {% endfor %}
 {% endif %}
