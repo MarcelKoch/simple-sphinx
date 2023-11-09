@@ -30,8 +30,7 @@ def parse_args():
 
 def read_template(path):
     with open(path, "r") as f:
-        return jinja2.Template(f.read(), keep_trailing_newline=True, trim_blocks=True)
-
+        return jinja2.Template(f.read(), keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
 
 def read_var_map(path):
     with open(path, "r") as f:
