@@ -21,11 +21,13 @@
    {% for cl in desc_line.code %}
    {{ cl }}
    {% endfor %}
+
 {% elif desc_line['@kind'] == 'block_math' %}
 
 .. math::
 
-   {{ desc_line.code }}  
+   {{ desc_line.code }}
+
 {% elif desc_line['@kind'] == 'inline_code' %}
 ::`{{ desc_line.code }}`
 {% elif desc_line['@kind'] == 'inline_math' %}
