@@ -181,8 +181,8 @@ def dispatch_tag_(tag: xml_tag.HIGHLIGHT.value, expr: MD.Element, ctx):
 def dispatch_tag_(tag: xml_tag.PARAMETERITEM.value, expr: MD.Element, ctx):
     data = dispatch_default(expr, ctx)
     item = data[expr.tagName]
-    return {expr.tagName: {"parametername": item["parameternamelist"]["parametername"],
-                           "parameterdescription": item["parameterdescription"]}}
+    return {expr.tagName: [{"parametername": item["parameternamelist"]["parametername"],
+                            "parameterdescription": item["parameterdescription"]}]}
 
 
 @dispatch_tag.register
