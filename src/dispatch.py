@@ -12,7 +12,6 @@ from typing import Any
 gko_directory = "../../ginkgo/document-create-functions/doc/doxygen/xml"
 simple_directory = "doxygen/xml"
 
-
 enum_types = set()
 
 
@@ -34,6 +33,8 @@ class xml_tag(UniqueEnumType):
     COMPOUNDDEF = auto()
     DETAILEDDESCRIPTION = auto()
     BRIEFDESCRIPTION = auto()
+    INNERCLASS = auto()
+    HIGHLIGHT = auto()
     MEMBERDEF = auto()
     NAME = auto()
     PARA = auto()
@@ -41,7 +42,9 @@ class xml_tag(UniqueEnumType):
     PARAMETERITEM = auto()
     PARAMETERLIST = auto()
     PARAM = auto()
+    PROGRAMLISTING = auto()
     SECTIONDEF = auto()
+    SP = auto()
     TEMPLATEPARAMLIST = auto()
     TYPE = auto()
 
@@ -74,7 +77,10 @@ def dispatch_default(expr: MD.Element, ctx):
         unique_kwargs = [(k, a[k]) for k in set(a.keys()) - common_keys] + [(k, b[k]) for k in
                                                                             set(b.keys()) - common_keys]
         shared_kwargs = [(k, as_list(a[k]) + as_list(b[k])) for k in common_keys]
-        return dict(unique_kwargs + shared_kwargs)
+        merged = dict(unique_kwargs + shared_kwargs)
+        if "#text" in merged:
+            merged["#text"] = "".join(merged["#text"])
+        return merged
 
     attribs = {f"@{k}": v for k, v in expr.attributes.items()}
     data = {expr.tagName: reduce(lambda r, c: merge(r, dispatch(c, ctx)), expr.childNodes, attribs)}
@@ -99,6 +105,11 @@ def dispatch_(expr: MD.Text, ctx):
 
 
 @dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.SP.value, expr: MD.Element, ctx):
+    return {"#text": " "}
+
+
+@dispatch_tag.register
 def dispatch_tag_(tag: xml_tag.PARA.value, expr: MD.Element, ctx):
     return {"para": [dispatch(c, ctx) for c in expr.childNodes]}
 
@@ -110,7 +121,8 @@ def dispatch_tag_(tag: xml_tag.COMPOUNDDEF.value, expr: MD.Element,
     data["name"] = data["compoundname"]["#text"]
     sections = as_list(data.get("sectiondef", [dict()]))
     data["sectiondef"] = reduce(lambda r, d: r | d, sections, dict())
-    data["innerclass"] = as_list(data.get("innerclass", []))
+    for key in ["innerclass", "derivedcompoundref", "basecompoundref"]:
+        data[key] = as_list(data.get(key, []))
     for key in ["#text", "inheritancegraph", "collaborationgraph", "compoundname"]:
         if key in data:
             del data[key]
@@ -148,7 +160,7 @@ def dispatch_tag_(
         para = [[]]
     if len(para) > 0 and not all(isinstance(l, list) for l in para):
         para = [para]
-    return {expr.tagName: para}
+    return {expr.tagName: {"para": para}}
 
 
 @dispatch_tag.register
@@ -160,15 +172,46 @@ def dispatch_tag_(tag: xml_tag.TYPE.value, expr: MD.Element, ctx):
 
 
 @dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.HIGHLIGHT.value, expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    return {k: v for k, v in data[expr.tagName].items() if k != "@class"}
+
+
+@dispatch_tag.register
 def dispatch_tag_(tag: xml_tag.PARAMETERITEM.value, expr: MD.Element, ctx):
     data = dispatch_default(expr, ctx)
     item = data[expr.tagName]
     return {expr.tagName: {"parametername": item["parameternamelist"]["parametername"],
                            "parameterdescription": item["parameterdescription"]}}
 
+
 @dispatch_tag.register
 def dispatch_tag_(tag: xml_tag.NAME.value, expr: MD.Element, ctx):
     return {expr.tagName: expr.childNodes[0].data}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.INNERCLASS.value, expr: MD.Element, ctx):
+    return {expr.tagName: expr.attributes["refid"].value}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.PROGRAMLISTING.value, expr: MD.Element, ctx):
+    codelines = [dispatch_default(c, ctx) for c in expr.childNodes if
+                 isinstance(c, MD.Element) and c.tagName == "codeline"]
+    if "filename" in expr.attributes:
+        style = expr.attributes["filename"].value.lstrip(".")
+    else:
+        try:
+            first_line = codelines[0]["codeline"]["#text"]
+            if first_line.startswith("{") and first_line.endswith("}"):
+                codelines = codelines[1:]
+                style = first_line.strip("{}")
+            else:
+                raise
+        except:
+            style = "text"
+    return {expr.tagName: {"style": style, "code": codelines}}
 
 
 def dispatch_index(expr: MD.Document, ctx):
@@ -195,6 +238,8 @@ def dispatch_index(expr: MD.Document, ctx):
         if new_data and kind != "file":
             data[scope][new_data["@id"]] = new_data
         if new_data and kind == "file":
+            if "programlisting" in new_data:
+                del new_data["programlisting"]
             innerclasses = new_data.pop('innerclass', [])
             innernamespaces = new_data.pop('innernamespace', [])
             sections = new_data.pop('sectiondef', dict())
