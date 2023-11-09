@@ -78,11 +78,18 @@ def stringify(expr):
         case {"@kind": "templateparameter", "parameter": param}:
             return ' '.join(stringify(param))
         case {"para": para}:
-            lines = []
+            paragraphs = []
             for p in para:
-                lines += stringify(p)
-                lines += ["\n"]
-            return lines
+                def flatten(xs):
+                    result = []
+                    for x in xs:
+                        if isinstance(x, list):
+                            result += flatten(x)
+                        else:
+                            result.append(x)
+                    return result
+                paragraphs.append(flatten(stringify(p)) + ["\n"])
+            return paragraphs
         case {"#text": text}:
             return text
         case dict(d):
