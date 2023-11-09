@@ -63,7 +63,9 @@ def stringify(expr):
                 if not code.endswith("\]"):
                     raise RuntimeError(f"Can't handle math element: {code}")
                 code = code.strip("\[]")
-                return {"@kind": "block_math", "code": code}
+                if not isinstance(code, list):
+                    code = [code]
+                return {"@directive": "math", "lines": code}
             else:
                 code = code.strip("$")
                 return f":math:`{code}`"
@@ -72,7 +74,7 @@ def stringify(expr):
         case {"codeline": code}:
             return stringify(code)
         case {"programlisting": {"style": style, "code": code}}:
-            return {"@kind": "block_code", "style": style, "code": stringify(code)}
+            return {"@directive": "code-block", "@opts": style, "lines": stringify(code)}
         case {"@kind": "parameter", "name": name, "description": desc}:
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
