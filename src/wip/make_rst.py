@@ -77,6 +77,30 @@ def stringify(expr):
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
             return ' '.join(stringify(param))
+        case {"simplesect": {"@kind": "see", "para": para}}:
+            return f"see {''.join(stringify(para))}"
+        case {"simplesect": {"@kind": "return", "para": para}}:
+            return f":return: {''.join(stringify(para))}"
+        case {"simplesect": {"@kind": "note", "para": para}}:
+            return {"@directive": "note", "lines": stringify(para)}
+        case {"simplesect": {"@kind": "warning", "para": para}}:
+            return {"@directive": "warning", "lines": stringify(para)}
+        case {"@kind": kind, "parametername": name, "parameterdescription": desc}:
+            role = "tparam" if kind == "templateparameter" else "param"
+            return {"@role": f"{role} {name}", "lines": stringify({'para': desc})}
+        case {"parametername": name, "parameterdescription": desc}:
+            desc = stringify(desc)
+            try:
+                if len(desc) > 1:
+                    raise
+                desc = "".join(desc[0]).rstrip()
+            except:
+                raise RuntimeError("Can't handle parameter description with multiple paragraphs")
+            return {"name": stringify(name), "desc": desc}
+        case {"parameterlist": {"parameteritem": items, **kwargs}}:
+            role = "tparam" if kwargs.get("@kind", "") == "templateparam" else "param"
+            items = stringify(items)
+            return [{"@role": f"{role} {item['name']}", "lines": item["desc"]} for item in items]
         case {"para": para}:
             paragraphs = []
             for p in para:
