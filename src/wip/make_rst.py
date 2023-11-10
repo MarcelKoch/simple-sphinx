@@ -47,6 +47,16 @@ def is_class_name_specialization(name):
 
 
 def stringify(expr):
+    def force_single_line(para):
+        try:
+            if len(para) > 1:
+                raise
+            return "".join(para[0]).rstrip()
+        except:
+            print(f"Encountered nested paragraphs: {para}", file=sys.stderr)
+            return ""
+            # raise RuntimeError("Can't handle parameter description with multiple paragraphs")
+
     match expr:
         case str(body):
             return body
@@ -79,25 +89,25 @@ def stringify(expr):
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
             return ' '.join(stringify(param))
-        case {"simplesect": {"@kind": "see", "para": para}}:
-            return f"see {''.join(stringify(para))}"
-        case {"simplesect": {"@kind": "return", "para": para}}:
-            return f":return: {''.join(stringify(para))}"
-        case {"simplesect": {"@kind": "note", "para": para}}:
+        case {"simplesect": {"@kind": "see", **para}}:
+            return f"see {force_single_line(stringify(para))}"
+        case {"simplesect": {"@kind": "return", **para}}:
+            return f":return: {force_single_line(stringify(para))}"
+        case {"simplesect": {"@kind": "note", **para}}:
             return {"@directive": "note", "lines": stringify(para)}
         case {"simplesect": {"@kind": "warning", "para": para}}:
             return {"@directive": "warning", "lines": stringify(para)}
+        case {"itemizedlist": {"listitem": items}}:
+            return ["\n"] + [f"* {force_single_line(stringify(item['para']))}" for item in items] + ["\n"]
+        case {"orderedlist": {"listitem": items}}:
+            return ["\n"] + [f"{n}. {force_single_line(stringify(item['para']))}" for n, item in enumerate(items)] + ["\n"]
+        case {"blockquote": para}:
+            return {"@directive": "epigraph", "lines": stringify(para)}
         case {"@kind": kind, "parametername": name, "parameterdescription": desc}:
             role = "tparam" if kind == "templateparameter" else "param"
             return {"@role": f"{role} {name}", "lines": stringify({'para': desc})}
         case {"parameternamelist": {"parametername": name}, "parameterdescription": desc}:
-            desc = stringify(desc)
-            try:
-                if len(desc) > 1:
-                    raise
-                desc = "".join(desc[0]).rstrip()
-            except:
-                raise RuntimeError("Can't handle parameter description with multiple paragraphs")
+            desc = force_single_line(stringify(desc))
             return {"name": stringify(name), "desc": desc}
         case {"parameterlist": {"parameteritem": items, **kwargs}}:
             role = "tparam" if kwargs.get("@kind", "") == "templateparam" else "param"
