@@ -159,6 +159,32 @@ def get_class_id_by_name(name, classes):
     exit(-1)
 
 
+def extract_class_template_parameters(data: dict) -> dict:
+    """Extract template parameters description form brief/detailed description
+
+    Since our .rst template introduces sections, we have to make sure that
+    the class template parameter description is before any sections within
+    a class. Thus, the description is removed from the normal doxygen place,
+    and put into its own array.
+    """
+    template_desc = []
+    for desc in ["briefdescription", "detaileddescription"]:
+        removal_idxs = []
+        for pid, para in enumerate(data[desc]):
+            for lid, line in enumerate(para):
+                match line:
+                    case {"@role": role}:
+                        if role.startswith("tparam"):
+                            removal_idxs.append((pid, lid))
+                    case _:
+                        pass
+        for pid, lid in removal_idxs:
+            template_desc.append(data[desc][pid][lid])
+        for pid, lid in sorted(removal_idxs, reverse=True):
+            del data[desc][pid][lid]
+    return data | {"templatedescription": template_desc}
+
+
 def main():
     args = parse_args()
 
@@ -196,6 +222,7 @@ def main():
         data["hidden"] = data.get("is_special", False) or data.get("is_inner", False)
         with open(out_file, "w") as f:
             string_data = stringify(data)
+            string_data = extract_class_template_parameters(string_data)
             f.write(template.render(string_data))
         # endwith
     # endfor
