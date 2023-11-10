@@ -77,7 +77,7 @@ def stringify(expr):
                 code = code.strip("\[]")
                 if not isinstance(code, list):
                     code = [code]
-                return {"@directive": "math", "lines": code}
+                return {"@directive": "math", "lines": [code]}
             else:
                 code = code.strip("$")
                 return f":math:`{code}`"
