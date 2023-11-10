@@ -90,7 +90,7 @@ def stringify(expr):
         case {"@kind": kind, "parametername": name, "parameterdescription": desc}:
             role = "tparam" if kind == "templateparameter" else "param"
             return {"@role": f"{role} {name}", "lines": stringify({'para': desc})}
-        case {"parametername": name, "parameterdescription": desc}:
+        case {"parameternamelist": {"parametername": name}, "parameterdescription": desc}:
             desc = stringify(desc)
             try:
                 if len(desc) > 1:

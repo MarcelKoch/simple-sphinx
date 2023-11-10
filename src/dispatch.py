@@ -35,18 +35,30 @@ class xml_tag(UniqueEnumType):
     BRIEFDESCRIPTION = auto()
     INNERCLASS = auto()
     HIGHLIGHT = auto()
-    MEMBERDEF = auto()
     NAME = auto()
     PARA = auto()
     PARAMETERDESCRIPTION = auto()
-    PARAMETERITEM = auto()
-    PARAMETERLIST = auto()
-    PARAM = auto()
     PROGRAMLISTING = auto()
     SECTIONDEF = auto()
     SP = auto()
-    TEMPLATEPARAMLIST = auto()
     TYPE = auto()
+
+
+NO_TEXT = {
+    "compounddef",
+    "listofallmembers",
+    "memberdef",
+    "param",
+    "parameteritem",
+    "parameterlist",
+    "parameternamelist",
+    "templateparamlist"
+}
+
+FORCE_LIST = {
+    "param",
+    "parameteritem"
+}
 
 
 def as_list(v):
@@ -82,8 +94,16 @@ def dispatch_default(expr: MD.Element, ctx):
             merged["#text"] = "".join(merged["#text"])
         return merged
 
+    tag = expr.tagName
     attribs = {f"@{k}": v for k, v in expr.attributes.items()}
-    data = {expr.tagName: reduce(lambda r, c: merge(r, dispatch(c, ctx)), expr.childNodes, attribs)}
+    data = {tag: reduce(lambda r, c: merge(r, dispatch(c, ctx)), expr.childNodes, attribs)}
+
+    if tag in NO_TEXT:
+        if "#text" in data[tag]:
+            del data[tag]["#text"]
+    if tag in FORCE_LIST:
+        data = {tag: as_list(data[tag])}
+
     return data
 
 
@@ -123,28 +143,10 @@ def dispatch_tag_(tag: xml_tag.COMPOUNDDEF.value, expr: MD.Element,
     data["sectiondef"] = reduce(lambda r, d: r | d, sections, dict())
     for key in ["innerclass", "derivedcompoundref", "basecompoundref"]:
         data[key] = as_list(data.get(key, []))
-    for key in ["#text", "inheritancegraph", "collaborationgraph", "compoundname"]:
+    for key in ["inheritancegraph", "collaborationgraph", "compoundname"]:
         if key in data:
             del data[key]
     return {expr.tagName: data}
-
-
-@dispatch_tag.register
-def dispatch_tag_(tag: xml_tag.MEMBERDEF.value | xml_tag.TEMPLATEPARAMLIST.value |
-                       xml_tag.PARAMETERLIST.value, expr: MD.Element,
-                  ctx):
-    data = dispatch_default(expr, ctx)
-    if "#text" in data[expr.tagName]:
-        del data[expr.tagName]["#text"]
-    return data
-
-
-@dispatch_tag.register
-def dispatch_tag_(tag: xml_tag.PARAM.value, expr: MD.Element, ctx):
-    data = dispatch_default(expr, ctx)
-    if "#text" in data[expr.tagName]:
-        del data[expr.tagName]["#text"]
-    return {expr.tagName: as_list(data[expr.tagName])}
 
 
 @dispatch_tag.register
@@ -183,14 +185,6 @@ def dispatch_tag_(tag: xml_tag.TYPE.value, expr: MD.Element, ctx):
 def dispatch_tag_(tag: xml_tag.HIGHLIGHT.value, expr: MD.Element, ctx):
     data = dispatch_default(expr, ctx)
     return {k: v for k, v in data[expr.tagName].items() if k != "@class"}
-
-
-@dispatch_tag.register
-def dispatch_tag_(tag: xml_tag.PARAMETERITEM.value, expr: MD.Element, ctx):
-    data = dispatch_default(expr, ctx)
-    item = data[expr.tagName]
-    return {expr.tagName: [{"parametername": item["parameternamelist"]["parametername"],
-                            "parameterdescription": item["parameterdescription"]}]}
 
 
 @dispatch_tag.register
