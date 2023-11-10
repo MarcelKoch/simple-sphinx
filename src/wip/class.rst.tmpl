@@ -11,9 +11,14 @@
 None
 {% else %}
 
+.. hlist::
+   :columns: 1
+
+{% filter indent(3, first=True) %}
 {% for rel in relatives %}
 * {{ rel }}
 {% endfor %}
+{% endfilter %}
 {% endif %}
 {% endmacro %}
 
@@ -83,13 +88,13 @@ template<>
 {% for i in name %}={% endfor %}
 
 .. cpp:class:: {{ print_templateparameters(templateparamlist)}} {{ name }}
-{% filter indent(3) %}
+{% filter indent(3, first=True) %}
 
 {% for param in templatedescription %}
-:{{ param["@role"] }}: {{ param["lines"] }}{% if not loop.last %}, {% endif %}
+:{{ param["@role"] }}: {{ param["lines"] }}
 {% endfor %}
 
-
+{% if derivedcompoundref|length > 0 or basecompoundref|length > 0 %}
 Inheritance
 -----------
 
@@ -98,18 +103,24 @@ Inherited by:
 
 Inherits:
 {{ print_relatives(basecompoundref) }}
+{% endif %}
 
+
+{% if briefdescription|select|list|length > 0 or detaileddescription|select|list|length > 0 %}
 Description  
------------  
+-----------
 
 {{ print_desc(briefdescription) }}
 
 {{ print_desc(detaileddescription) }}
+{% endif %}
+
 
 {% if 'id' in specializationof %}
 Specialization of :ref:`{{ specializationof.name }}<{{specializationof.id}}>`  
 
 {% endif %}
+
 
 {% if specializations|length > 0 %}
 .. rst-class:: classref-reftable-group
@@ -125,6 +136,7 @@ Specializations
 {% endfor %}
 {% endif %}
 
+
 {% if innerclass|length > 0 %}
 .. rst-class:: classref-reftable-group
 
@@ -139,21 +151,47 @@ Inner Classes
 {% endfor %}
 {% endif %}
 
+
 {% if sectiondef["public-func"]|length > 0 or sectiondef["protected-func"]|length > 0 %}
 .. rst-class:: classref-reftable-group
 
 Methods
 -------
 
-
-{% for id, func in sectiondef["public-func"].items() %}
+{% for id, func in sectiondef["public-func"]["default"].items() %}
 .. _{{ id }}:
+
 .. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ normalize(func.definition) }}{{ normalize(func.argsstring) }}
 
 {{ print_desc(func.briefdescription, level=1) }}
 {{ print_desc(func.detaileddescription, level=1) }}
 {% endfor %}
+
+
+
+{% if sectiondef["public-func"]["inherited"]|length > 0 %}
+
+Inherited Methods
+^^^^^^^^^^^^^^^^^
+
+{% for class_id, methods in sectiondef["public-func"]["inherited"].items() %}
+{% set heading = ":any:`{} <{}>`".format(class_names[class_id], class_id) %}
+{{ heading }}
+{% for i in heading%}"{% endfor %}
+
+{% for id, func in methods.items() %}
+.. _{{ id }}:
+
+.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ normalize(func.definition) }}{{ normalize(func.argsstring) }}
+
+{{ print_desc(func.briefdescription, level=1) }}
+{{ print_desc(func.detaileddescription, level=1) }}
+{% endfor %}
+
+{% endfor %}
 {% endif %}
+{% endif %}
+
 
 {% if sectiondef["public-attrib"]|length > 0 %}
 .. rst-class:: classref-reftable-group

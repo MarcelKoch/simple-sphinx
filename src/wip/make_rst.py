@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import random
 import sys
 from itertools import groupby
 
@@ -127,7 +128,7 @@ def stringify(expr):
                         else:
                             result.append(x)
                     return result
-                paragraphs.append(flatten(stringify(p)) + ["\n"])
+                paragraphs.append(flatten(stringify(p)))
             return paragraphs
         case {"ulink": {"@url": url, "#text": text}}:
             return f"`{text} <{url}>`_"
@@ -215,6 +216,12 @@ def main():
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
                     data['specializations'][inner_key] = {'name': inner_data['name']}
 
+    MAX_NUM_CLASSES = 20
+    random.seed(1337)
+    var_map["classes"] = {k: v for k, v in random.choices(list(var_map["classes"].items()), k=MAX_NUM_CLASSES)}
+
+    class_names = {id: c["name"] for id, c in var_map["classes"].items()}
+
     out_dir = Path(args.output)
     for key, data in var_map["classes"].items():
         # This is safer for use with http urls
@@ -226,6 +233,7 @@ def main():
         with open(out_file, "w") as f:
             string_data = stringify(data)
             string_data = extract_class_template_parameters(string_data)
+            string_data.update(class_names=class_names)
             f.write(template.render(string_data))
         # endwith
     # endfor
