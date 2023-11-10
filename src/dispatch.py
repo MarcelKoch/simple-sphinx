@@ -30,7 +30,9 @@ class xml_tag(UniqueEnumType):
     doxygen parts. The ones defined here need special treatment.
     """
 
+    BLOCKQUOTE = auto()
     COMPOUNDDEF = auto()
+    COMPUTEROUTPUT = auto()
     DETAILEDDESCRIPTION = auto()
     BRIEFDESCRIPTION = auto()
     INNERCLASS = auto()
@@ -56,6 +58,7 @@ NO_TEXT = {
 }
 
 FORCE_LIST = {
+    "listitem",
     "param",
     "parameteritem"
 }
@@ -125,13 +128,19 @@ def dispatch_(expr: MD.Text, ctx):
 
 
 @dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.BLOCKQUOTE.value, expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    return data
+
+
+@dispatch_tag.register
 def dispatch_tag_(tag: xml_tag.SP.value, expr: MD.Element, ctx):
     return {"#text": " "}
 
 
 @dispatch_tag.register
 def dispatch_tag_(tag: xml_tag.PARA.value, expr: MD.Element, ctx):
-    return {"para": [dispatch(c, ctx) for c in expr.childNodes]}
+    return {"para": [[dispatch(c, ctx) for c in expr.childNodes]]}
 
 
 @dispatch_tag.register
@@ -147,6 +156,20 @@ def dispatch_tag_(tag: xml_tag.COMPOUNDDEF.value, expr: MD.Element,
         if key in data:
             del data[key]
     return {expr.tagName: data}
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.COMPUTEROUTPUT.value, expr: MD.Element, ctx):
+    def get_text_node(node):
+        text_nodes = []
+        for c in node.childNodes:
+            if isinstance(c, MD.Text):
+                text_nodes.append(c)
+            else:
+                text_nodes += get_text_node(c)
+        return text_nodes
+    data = {expr.tagName: {"#text": "".join([t.data for t in get_text_node(expr)]).replace("\\<", "<").replace("\\>", ">")}}
+    return data
 
 
 @dispatch_tag.register
@@ -208,7 +231,7 @@ def dispatch_tag_(tag: xml_tag.PROGRAMLISTING.value, expr: MD.Element, ctx):
                 raise
         except:
             style = "text"
-    return {expr.tagName: {"style": style, "code": codelines}}
+    return {expr.tagName: {"style": style, "para": [codelines]}}
 
 
 def dispatch_index(expr: MD.Document, ctx):
@@ -237,6 +260,8 @@ def dispatch_index(expr: MD.Document, ctx):
         if new_data and kind == "file":
             if "programlisting" in new_data:
                 del new_data["programlisting"]
+            if "incdepgraph" in new_data:
+                del new_data["incdepgraph"]
             innerclasses = new_data.pop('innerclass', [])
             innernamespaces = new_data.pop('innernamespace', [])
             sections = new_data.pop('sectiondef', dict())
@@ -258,6 +283,7 @@ def dispatch_index(expr: MD.Document, ctx):
             for kind, sec in sections.items():
                 for member in sec.values():
                     data[scope]['sectiondef'].setdefault(kind, dict())[member["@id"]] = member
+
 
     return data
 
