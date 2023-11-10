@@ -130,13 +130,21 @@ def dispatch_tag_(tag: xml_tag.COMPOUNDDEF.value, expr: MD.Element,
 
 
 @dispatch_tag.register
-def dispatch_tag_(tag: xml_tag.MEMBERDEF.value | xml_tag.PARAM.value | xml_tag.TEMPLATEPARAMLIST.value |
+def dispatch_tag_(tag: xml_tag.MEMBERDEF.value | xml_tag.TEMPLATEPARAMLIST.value |
                        xml_tag.PARAMETERLIST.value, expr: MD.Element,
                   ctx):
     data = dispatch_default(expr, ctx)
     if "#text" in data[expr.tagName]:
         del data[expr.tagName]["#text"]
     return data
+
+
+@dispatch_tag.register
+def dispatch_tag_(tag: xml_tag.PARAM.value, expr: MD.Element, ctx):
+    data = dispatch_default(expr, ctx)
+    if "#text" in data[expr.tagName]:
+        del data[expr.tagName]["#text"]
+    return {expr.tagName: as_list(data[expr.tagName])}
 
 
 @dispatch_tag.register
