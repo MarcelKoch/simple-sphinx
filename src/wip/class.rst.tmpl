@@ -44,6 +44,21 @@ None
 {% endfor %}
 {% endmacro %}
 
+{% macro print_func_qualifier(func) -%}
+{{ 'static ' if func["@static"] == "yes" else "" }}{{ 'virtual ' if func["@virt"] == "virtual" else "" }}{{ 'explicit ' if func["@explicit"] == "yes" else "" }}
+{%- endmacro %}
+
+{% macro print_func_tparams(func) -%}
+{% if func["templateparamlist"] is defined and func["templateparamlist"]["param"]|length > 0 -%}
+template<
+{%- for param in func["templateparamlist"]["param"] -%}
+{{ param["type"]}}{% if param["defname"] is defined %} {{ param["defname"]}}{% endif %}{{ ", " if not loop.last else "" }}
+{%- endfor -%}
+>
+{%- endif %}
+{%- endmacro %}
+
+
 {{ name }}
 {% for i in name %}={% endfor %}
 
@@ -116,7 +131,7 @@ Methods
 
 {% for id, func in sectiondef["public-func"].items() %}
 .. _{{ id }}:
-.. cpp:function:: {{ 'static ' if func["@static"] == "yes" else "" }}{{ 'virtual ' if func["@virt"] == "virtual" else "" }}{{ 'explicit ' if func["@explicit"] == "yes" else "" }} {{ func.definition }}{{ func.argsstring }} {{ "const" if func["@const"] == "yes" else "" }}
+.. cpp:function:: {{print_func_tparams(func)}} {{ print_func_qualifier(func) }} {{ func.definition }}{{ func.argsstring }} {{ "const" if func["@const"] == "yes" else "" }}
 
 {{ print_desc(func.briefdescription, level=1) }}
 {{ print_desc(func.detaileddescription, level=1) }}
