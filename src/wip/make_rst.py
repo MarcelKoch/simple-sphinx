@@ -194,9 +194,16 @@ def main():
 
     var_map['title'] = args.title
 
+    all_inner_classes = set()
+
+    for key, data in var_map["classes"].items():
+        for ic in data["innerclass"]:
+            var_map["classes"][ic] |= {"is_inner": True}
+            all_inner_classes.add(ic)
+
     for key, data in var_map["classes"].items():
         data["specializations"] = {}
-        data['is_special'] = is_class_name_specialization(data["name"])
+        data['is_special'] = is_class_name_specialization(data["name"]) and data["@id"] not in all_inner_classes
         if data['is_special']:
             stripped_name = strip_class_name_specialization(data["name"])
             stripped_id = get_class_id_by_name(stripped_name, var_map["classes"])
@@ -207,10 +214,6 @@ def main():
             if inner_data['is_special']:
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
                     data['specializations'][inner_key] = {'name': inner_data['name']}
-
-    for key, data in var_map["classes"].items():
-        for ic in data["innerclass"]:
-            var_map["classes"][ic] |= {"is_inner": True}
 
     out_dir = Path(args.output)
     for key, data in var_map["classes"].items():
