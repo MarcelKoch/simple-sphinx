@@ -165,12 +165,7 @@ def dispatch_tag_(
         tag: xml_tag.DETAILEDDESCRIPTION.value | xml_tag.BRIEFDESCRIPTION.value | xml_tag.PARAMETERDESCRIPTION.value,
         expr: MD.Element, ctx):
     data = dispatch_default(expr, ctx)
-    para = data[expr.tagName].get("para", [[]])
-    if len(para) == 0:
-        para = [[]]
-    if len(para) > 0 and not all(isinstance(l, list) for l in para):
-        para = [para]
-    return {expr.tagName: {"para": para}}
+    return {expr.tagName: {"para": data[expr.tagName].get("para", [[]])}}
 
 
 @dispatch_tag.register
