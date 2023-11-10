@@ -86,8 +86,8 @@ def stringify(expr):
             return f":code:`{code}`"
         case {"codeline": code}:
             return stringify(code)
-        case {"programlisting": {"style": style, "code": code}}:
-            return {"@directive": "code-block", "@opts": style, "lines": stringify(code)}
+        case {"programlisting": {"style": style, **para}}:
+            return {"@directive": "code-block", "@opts": style, "lines": stringify(para)}
         case {"@kind": "parameter", "name": name, "description": desc}:
             return f":param {name}: {desc}"
         case {"@kind": "templateparameter", "parameter": param}:
@@ -98,7 +98,7 @@ def stringify(expr):
             return f":return: {force_single_line(stringify(para))}"
         case {"simplesect": {"@kind": "note", **para}}:
             return {"@directive": "note", "lines": stringify(para)}
-        case {"simplesect": {"@kind": "warning", "para": para}}:
+        case {"simplesect": {"@kind": "warning", **para}}:
             return {"@directive": "warning", "lines": stringify(para)}
         case {"itemizedlist": {"listitem": items}}:
             return ["\n"] + [f"* {force_single_line(stringify(item['para']))}" for item in items] + ["\n"]
@@ -129,6 +129,18 @@ def stringify(expr):
                     return result
                 paragraphs.append(flatten(stringify(p)) + ["\n"])
             return paragraphs
+        case {"ulink": {"@url": url, "#text": text}}:
+            return f"`{text} <{url}>`_"
+        case {"heading": {"@level": level, "#text": text}}:
+            level = int(level)
+            sym = {0: "#", 1: "*", 2: "=", 3: "-", 4: "^", 5: '"'}
+            return f'{sym[level] * len(text)}\n{text}\n{sym[level] * len(text)}'
+        case {"bold": text}:
+            return f"**{stringify(text)}**"
+        case {"emphasis": text}:
+            return f"*{stringify(text)}*"
+        case {"ndash": _}:
+            return "---"
         case {"#text": text}:
             return text
         case dict(d):
