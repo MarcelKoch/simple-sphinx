@@ -238,44 +238,18 @@ def add_inheritance_section(data):
     """Segregate inherited members from non-inherited ones.
 
     Doxygen injects all members inherited from any base without
-    any relationship data. It seems to be possible to implicitly
-    deduce that from the member id, but that might be fragile.
-    So, this function finds the root class for all members
-    and annotates the returned data accordingly.
+    any relationship data. This deduces the original owner for any
+    member using a simple heuristic, based on the member id.
     """
     classes = data["classes"]
-    inheritance_graph = dict()
-    for id, c in classes.items():
-        inheritance_graph[id] = set()
-        for base in c["basecompoundref"]:
-            if base_id := base.get("@refid"):
-                inheritance_graph[id].add(base_id)
-
-    all_bases = dict()
-
-    def get_bases(node):
-        if processed_bases := all_bases.get(node):
-            return list(processed_bases)
-        elif new_bases := inheritance_graph[node]:
-            return sum((get_bases(base) for base in new_bases), list(new_bases))
-        else:
-            return []
-
-    for id in inheritance_graph:
-        all_bases[id] = set(get_bases(id))
 
     owning_class = dict()
     for id, c in classes.items():
         for sec, members in c["sectiondef"].items():
             for member_id in members:
-                if member_id not in owning_class:
-                    owning_class[member_id] = id
-                else:
-                    owner = owning_class[member_id]
-                    if owner not in all_bases[id]:
-                        owning_class[member_id] = id
-                    else:
-                        pass
+                owning_class[member_id] = member_id.rpartition("_1")[0]
+                if not owning_class[member_id] in classes:
+                    raise RuntimeError(f"Can't deduce heuristically the owning class of the member: {member_id}: {members[member_id]}")
 
     for id, c in classes.items():
         new_sectiondef = dict()
