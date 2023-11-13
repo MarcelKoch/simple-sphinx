@@ -30,9 +30,39 @@ def parse_args():
     return parser.parse_args()
 
 
-def read_template(path):
-    with open(path, "r") as f:
-        return jinja2.Template(f.read(), keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
+def create_jinja_env(path) -> jinja2.Environment:
+    def remove_matching_braces(s: str) -> str:
+        if len(s) == 0:
+            return str()
+        if s[0] != "<":
+            return s
+        nesting_level = -1
+        for i, c in enumerate(s):
+            match (c, nesting_level):
+                case (">", 0):
+                    return s[i + 1:]
+                case (">", _):
+                    nesting_level = nesting_level - 1
+                case ("<", _):
+                    nesting_level = nesting_level + 1
+        raise RuntimeError(f"Encountered unbalanced template brackets in string: {s}")
+
+    def normalize(s: str, scope: str):
+        prefix = f"{scope}"
+        idx = 0
+        while 0 <= idx < len(s):
+            idx = s.find(prefix, idx)
+            if idx >= 0:
+                r = remove_matching_braces(s[idx + len(prefix):])
+                if len(r) >= 2 and r[:2] == "::":
+                    s = s[:idx] + r[2:]
+        return s
+
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(path),
+                             keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
+    env.filters["normalize"] = normalize
+
+    return env
 
 def read_var_map(path):
     with open(path, "r") as f:
@@ -69,7 +99,7 @@ def stringify(expr):
         case {"@refid": id, "#text": name}:
             bracket_replacement = '\\<'
             id_str = f"<{id}>" if id else ""
-            return f":any:`{name.replace('<', bracket_replacement)}{id_str}`"
+            return f":std:ref:`{name.replace('<', bracket_replacement)}{id_str}`"
         case {"ref": ref}:
             return stringify(ref)
         case {"formula": {"#text": code}}:
@@ -190,7 +220,7 @@ def main():
     args = parse_args()
 
     template_dir = Path(args.template)
-    template = read_template(template_dir / "class.rst.tmpl")
+    template_env = create_jinja_env(template_dir)
     var_map = read_var_map(args.map)
 
     var_map['title'] = args.title
@@ -216,12 +246,13 @@ def main():
                 if key == inner_data['specialization_of'] and key != inner_data['name']:
                     data['specializations'][inner_key] = {'name': inner_data['name']}
 
-    MAX_NUM_CLASSES = 20
-    random.seed(1337)
-    var_map["classes"] = {k: v for k, v in random.choices(list(var_map["classes"].items()), k=MAX_NUM_CLASSES)}
-
     class_names = {id: c["name"] for id, c in var_map["classes"].items()}
 
+    MAX_NUM_CLASSES = 20
+    random.seed(1337)
+    var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()), min(len(var_map["classes"]), MAX_NUM_CLASSES))}
+
+    class_template = template_env.get_template("class.rst.tmpl")
     out_dir = Path(args.output)
     for key, data in var_map["classes"].items():
         # This is safer for use with http urls
@@ -234,7 +265,7 @@ def main():
             string_data = stringify(data)
             string_data = extract_class_template_parameters(string_data)
             string_data.update(class_names=class_names)
-            f.write(template.render(string_data))
+            f.write(class_template.render(string_data))
         # endwith
     # endfor
 
@@ -245,11 +276,10 @@ def main():
     # endwith
 
     out_index = out_dir / "index.rst"
-    template_index = read_template(template_dir / "index.rst.tmpl")
-    # print(json.dumps(stringify(var_map), indent=2))
+    index_template = template_env.get_template("index.rst.tmpl")
     var_map["classes"] = dict(sorted(var_map["classes"].items(), key=lambda k: k[1]['name']))
     with open(out_index, "w") as f:
-        f.write(template_index.render(var_map))
+        f.write(index_template.render(var_map))
 
 
 if __name__ == "__main__":
