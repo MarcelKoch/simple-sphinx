@@ -30,6 +30,10 @@ def parse_args():
     return parser.parse_args()
 
 
+scope_re_cache = dict()
+
+
+
 def create_jinja_env(path) -> jinja2.Environment:
     def remove_matching_braces(s: str) -> str:
         if len(s) == 0:
@@ -78,7 +82,12 @@ def is_class_name_specialization(name):
     return strip_class_name_specialization(name) != name
 
 
-def stringify(expr):
+def stringify(expr, scope=None):
+    scope = scope or []
+
+    def remove_scope(s: str) ->str:
+        pass
+
     def force_single_line(para):
         try:
             if len(para) > 1:
@@ -119,10 +128,6 @@ def stringify(expr):
             return stringify(code)
         case {"programlisting": {"style": style, **para}}:
             return {"@directive": "code-block", "@opts": style, "lines": stringify(para)}
-        case {"@kind": "parameter", "name": name, "description": desc}:
-            return f":param {name}: {desc}"
-        case {"@kind": "templateparameter", "parameter": param}:
-            return ' '.join(stringify(param))
         case {"simplesect": {"@kind": "see", **para}}:
             return f"see {force_single_line(stringify(para))}"
         case {"simplesect": {"@kind": "return", **para}}:
@@ -137,9 +142,6 @@ def stringify(expr):
             return ["\n"] + [f"{n}. {force_single_line(stringify(item['para']))}" for n, item in enumerate(items)] + ["\n"]
         case {"blockquote": para}:
             return {"@directive": "epigraph", "lines": stringify(para)}
-        case {"@kind": kind, "parametername": name, "parameterdescription": desc}:
-            role = "tparam" if kind == "templateparameter" else "param"
-            return {"@role": f"{role} {name}", "lines": stringify({'para': desc})}
         case {"parameternamelist": {"parametername": name}, "parameterdescription": desc}:
             desc = force_single_line(stringify(desc))
             return {"name": stringify(name), "desc": desc}
@@ -249,8 +251,8 @@ def main():
     class_names = {id: c["name"] for id, c in var_map["classes"].items()}
 
     MAX_NUM_CLASSES = 20
-    random.seed(1337)
-    var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()), min(len(var_map["classes"]), MAX_NUM_CLASSES))}
+    random.seed(138)
+    # var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()), min(len(var_map["classes"]), MAX_NUM_CLASSES))}
 
     class_template = template_env.get_template("class.rst.tmpl")
     out_dir = Path(args.output)
