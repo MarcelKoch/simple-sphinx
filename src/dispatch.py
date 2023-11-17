@@ -240,6 +240,8 @@ def add_inheritance_section(data):
     Doxygen injects all members inherited from any base without
     any relationship data. This deduces the original owner for any
     member using a simple heuristic, based on the member id.
+    It also removes pure virtual functions from the set of inherited
+    functions.
     """
     classes = data["classes"]
 
@@ -259,6 +261,10 @@ def add_inheritance_section(data):
                 owner_id = owning_class[member_id]
                 if owner_id == id:
                     new_sectiondef[sec]["default"][member_id] = member
+                elif member.get("@virt", "no") == "pure-virtual":
+                    # pure virtual functions are ignored, they are implemented either in another base
+                    # or in a derived class
+                    pass
                 else:
                     new_sectiondef[sec]["inherited"].setdefault(owner_id, dict())
                     new_sectiondef[sec]["inherited"][owner_id][member_id] = member
