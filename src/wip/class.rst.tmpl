@@ -176,7 +176,8 @@ Inherited Methods
 {% for i in heading%}"{% endfor %}
 
 {% for id, func in methods.items() %}
-.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ func.definition }}{{ func.argsstring }}
+{% set return_value, _, definition = func.definition.rpartition(" ") %}
+.. cpp:alias:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }} {{ return_value }} {{ definition }}{{ func.argsstring }}
 
 {% endfor %}
 
