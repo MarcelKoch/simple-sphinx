@@ -3,6 +3,7 @@ import argparse
 import json
 import random
 import sys
+from dataclasses import dataclass
 from itertools import groupby
 
 import jinja2
@@ -35,6 +36,31 @@ scope_re_cache = dict()
 
 
 def create_jinja_env(path) -> jinja2.Environment:
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(path),
+                             keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
+    return env
+
+
+def read_var_map(path):
+    with open(path, "r") as f:
+        return json.loads(f.read())
+
+
+def strip_class_name_specialization(name):
+    return ''.join(name.partition('<')[0:1]).rstrip()
+
+
+def is_class_name_specialization(name):
+    return strip_class_name_specialization(name) != name
+
+
+@dataclass
+class Context(object):
+    class_names: dict
+    scope: str | None = None
+
+
+def stringify(expr, ctx: Context = Context({})):
     def remove_matching_braces(s: str) -> str:
         if len(s) == 0:
             return str()
@@ -51,7 +77,9 @@ def create_jinja_env(path) -> jinja2.Environment:
                     nesting_level = nesting_level + 1
         raise RuntimeError(f"Encountered unbalanced template brackets in string: {s}")
 
-    def normalize(s: str, scope: str):
+    def normalize(s: str, scope: str | None):
+        if scope is None:
+            return s
         prefix = f"{scope}"
         idx = 0
         while 0 <= idx < len(s):
@@ -60,39 +88,15 @@ def create_jinja_env(path) -> jinja2.Environment:
                 r = remove_matching_braces(s[idx + len(prefix):])
                 if len(r) >= 2 and r[:2] == "::":
                     s = s[:idx] + r[2:]
+                else:
+                    idx = -1
         return s
-
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(path),
-                             keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
-    env.filters["normalize"] = normalize
-
-    return env
-
-def read_var_map(path):
-    with open(path, "r") as f:
-        return json.loads(f.read())
-    # endwith
-
-
-def strip_class_name_specialization(name):
-    return ''.join(name.partition('<')[0:1]).rstrip()
-
-
-def is_class_name_specialization(name):
-    return strip_class_name_specialization(name) != name
-
-
-def stringify(expr, scope=None):
-    scope = scope or []
-
-    def remove_scope(s: str) ->str:
-        pass
 
     def force_single_line(para):
         try:
             if len(para) > 1:
                 raise
-            return "".join(para[0]).rstrip()
+            return normalize("".join(para[0]).rstrip(), ctx.scope)
         except:
             print(f"Encountered nested paragraphs: {para}", file=sys.stderr)
             return ""
@@ -102,15 +106,20 @@ def stringify(expr, scope=None):
         case str(body):
             return body
         case list(l):
-            return [stringify(elems) for elems in l]
+            return [stringify(elems, ctx) for elems in l]
         case {"@id": id, **kwargs}:
-            return stringify({"id": id, **kwargs})
-        case {"@refid": id, "#text": name}:
+            return stringify({"id": id, **kwargs}, ctx)
+        case {"@refid": id, "#text": label}:
             bracket_replacement = '\\<'
             id_str = f"<{id}>" if id else ""
-            return f":std:ref:`{name.replace('<', bracket_replacement)}{id_str}`"
+            return f":std:ref:`{label.replace('<', bracket_replacement)}{id_str}`"
+        case {"@refid": id, "scope": {"#text": label_scope}, "name": name}:
+            bracket_replacement = '\\<'
+            id_str = f"<{id}>" if id else ""
+            label = "::".join((label_scope, name)) if label_scope else name
+            return f":std:ref:`{label.replace('<', bracket_replacement)}{id_str}`"
         case {"ref": ref}:
-            return stringify(ref)
+            return stringify(ref, ctx)
         case {"formula": {"#text": code}}:
             if code.startswith("\["):
                 if not code.endswith("\]"):
@@ -133,9 +142,9 @@ def stringify(expr, scope=None):
         case {"simplesect": {"@kind": "return", **para}}:
             return f":return: {force_single_line(stringify(para))}"
         case {"simplesect": {"@kind": "note", **para}}:
-            return {"@directive": "note", "lines": stringify(para)}
+            return {"@directive": "note", "lines": stringify(para, ctx)}
         case {"simplesect": {"@kind": "warning", **para}}:
-            return {"@directive": "warning", "lines": stringify(para)}
+            return {"@directive": "warning", "lines": stringify(para, ctx)}
         case {"itemizedlist": {"listitem": items}}:
             return ["\n"] + [f"* {force_single_line(stringify(item['para']))}" for item in items] + ["\n"]
         case {"orderedlist": {"listitem": items}}:
@@ -144,10 +153,10 @@ def stringify(expr, scope=None):
             return {"@directive": "epigraph", "lines": stringify(para)}
         case {"parameternamelist": {"parametername": name}, "parameterdescription": desc}:
             desc = force_single_line(stringify(desc))
-            return {"name": stringify(name), "desc": desc}
+            return {"name": stringify(name, ctx), "desc": desc}
         case {"parameterlist": {"parameteritem": items, **kwargs}}:
             role = "tparam" if kwargs.get("@kind", "") == "templateparam" else "param"
-            items = stringify(items)
+            items = stringify(items, ctx)
             return [{"@role": f"{role} {item['name']}", "lines": item["desc"]} for item in items]
         case {"para": para}:
             paragraphs = []
@@ -160,25 +169,35 @@ def stringify(expr, scope=None):
                         else:
                             result.append(x)
                     return result
-                paragraphs.append(flatten(stringify(p)))
+
+                paragraphs.append(flatten(stringify(p, ctx)))
             return paragraphs
         case {"ulink": {"@url": url, "#text": text}}:
             return f"`{text} <{url}>`_"
-        case {"heading": {"@level": level, "#text": text}}:
+        case {"heading": {"@level": level, **text}}:
             level = int(level)
+            text = stringify(text, ctx)
             sym = {0: "#", 1: "*", 2: "=", 3: "-", 4: "^", 5: '"'}
             return f'{sym[level] * len(text)}\n{text}\n{sym[level] * len(text)}'
         case {"bold": text}:
-            return f"**{stringify(text)}**"
+            return f"**{stringify(text, ctx)}**"
         case {"emphasis": text}:
-            return f"*{stringify(text)}*"
+            return f"*{stringify(text, ctx)}*"
         case {"ndash": _}:
             return "---"
         case {"#text": text}:
-            return text
+            return normalize(text, ctx.scope)
+        case {"inherited": parents, **kwargs}:
+            data = {
+                **stringify(kwargs, ctx),
+                "inherited": {
+                    pid: stringify(v, Context(ctx.class_names, ctx.class_names[pid])) for pid, v in parents.items()
+                }
+            }
+            return data
         case dict(d):
             return dict(
-                (key, stringify(value)) for key, value in d.items()
+                (key, stringify(value, ctx)) for key, value in d.items()
             )
 
 
@@ -252,7 +271,8 @@ def main():
 
     MAX_NUM_CLASSES = 20
     random.seed(138)
-    # var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()), min(len(var_map["classes"]), MAX_NUM_CLASSES))}
+    # var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()),
+    #                                                      min(len(var_map["classes"]), MAX_NUM_CLASSES))}
 
     class_template = template_env.get_template("class.rst.tmpl")
     out_dir = Path(args.output)
@@ -263,8 +283,9 @@ def main():
         out_file = out_dir / out_name
         data["specializations"] = dict(sorted(data["specializations"].items(), key=lambda k: k[1]["name"]))
         data["hidden"] = data.get("is_special", False) or data.get("is_inner", False)
+        ctx = Context(class_names, data["name"])
         with open(out_file, "w") as f:
-            string_data = stringify(data)
+            string_data = stringify(data, ctx=ctx)
             string_data = extract_class_template_parameters(string_data)
             string_data.update(class_names=class_names)
             f.write(class_template.render(string_data))

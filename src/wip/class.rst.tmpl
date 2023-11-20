@@ -85,7 +85,6 @@ template<>
 
 .. cpp:class:: {{ print_templateparameters(templateparamlist)}} {{ name }}
 {% filter indent(3, first=True) %}
-{% filter normalize(name) %}
 
 {% for param in templatedescription %}
 :{{ param["@role"] }}: {{ param["lines"] }}
@@ -158,7 +157,7 @@ Methods
 {% for id, func in sectiondef["public-func"]["default"].items() %}
 .. _{{ id }}:
 
-.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ func.definition | normalize(name) }}{{ func.argsstring | normalize(name) }}
+.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ func.definition }}{{ func.argsstring }}
 
 {{ print_desc(func.briefdescription, level=1) }}
 {{ print_desc(func.detaileddescription, level=1) }}
@@ -175,16 +174,12 @@ Inherited Methods
 {% set heading = ":std:ref:`{} <{}>`".format(class_names[class_id], class_id) %}
 {{ heading }}
 {% for i in heading%}"{% endfor %}
-{% filter normalize(class_names[class_id]) %}
 
 {% for id, func in methods.items() %}
 .. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ func.definition }}{{ func.argsstring }}
 
-{{ print_desc(func.briefdescription, level=1) }}
-{{ print_desc(func.detaileddescription, level=1) }}
 {% endfor %}
 
-{% endfilter %}
 {% endfor %}
 {% endif %}
 {% endif %}
@@ -206,5 +201,4 @@ Vars
 {% endfor %}
 {% endif %}
 #}
-{% endfilter %}
 {% endfilter %}
