@@ -274,8 +274,9 @@ def main():
     # var_map["classes"] = {k: v for k, v in random.sample(list(var_map["classes"].items()),
     #                                                      min(len(var_map["classes"]), MAX_NUM_CLASSES))}
 
-    class_template = template_env.get_template("class.rst.tmpl")
     out_dir = Path(args.output)
+
+    class_template = template_env.get_template("class.rst.jinja")
     for key, data in var_map["classes"].items():
         # This is safer for use with http urls
         class_name = key
@@ -299,7 +300,7 @@ def main():
     # endwith
 
     out_index = out_dir / "index.rst"
-    index_template = template_env.get_template("index.rst.tmpl")
+    index_template = template_env.get_template("index.rst.jinja")
     var_map["classes"] = dict(sorted(var_map["classes"].items(), key=lambda k: k[1]['name']))
     with open(out_index, "w") as f:
         f.write(index_template.render(var_map))

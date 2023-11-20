@@ -11,3 +11,15 @@
 		{{ key }}
 {% endif %}{% endfor %}
 {% endif %}
+
+{% if namespaces|length > 0 %}
+
+.. toctree::
+		:maxdepth: 1
+		:caption: Namespace Reference
+		:name: toc-class-ref
+
+{% for key in namespaces %}
+		{{ key }}
+{% endfor %}
+{% endif %}
