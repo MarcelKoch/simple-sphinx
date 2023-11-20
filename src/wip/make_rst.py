@@ -279,8 +279,8 @@ def main():
     class_template = template_env.get_template("class.rst.jinja")
     for key, data in var_map["classes"].items():
         # This is safer for use with http urls
-        class_name = key
-        out_name = class_name + ".rst"
+        class_id = key
+        out_name = class_id + ".rst"
         out_file = out_dir / out_name
         data["specializations"] = dict(sorted(data["specializations"].items(), key=lambda k: k[1]["name"]))
         data["hidden"] = data.get("is_special", False) or data.get("is_inner", False)
@@ -292,6 +292,22 @@ def main():
             f.write(class_template.render(string_data))
         # endwith
     # endfor
+
+    allowed_namespaces = ["gko"]
+
+    namespace_template = template_env.get_template("namespace.rst.jinja")
+    for key, data in var_map["namespaces"].items():
+        # This is safer for use with http urls
+        name = data["name"]
+        if any((ns in name for ns in allowed_namespaces)):
+            namespace_id = key
+            out_name = namespace_id + ".rst"
+            out_file = out_dir / out_name
+            ctx = Context({}, name)
+            with open(out_file, "w") as f:
+                string_data = stringify(data, ctx=ctx)
+                f.write(namespace_template.render(string_data))
+
 
     # out_globs = out_dir / "globals.rst"
     # template_globs = read_template(template_dir / "globals.rst.tmpl")
