@@ -4,7 +4,7 @@ import json
 import random
 import sys
 from dataclasses import dataclass
-from itertools import groupby
+from collections import OrderedDict
 
 import jinja2
 from pathlib import Path
@@ -32,7 +32,6 @@ def parse_args():
 
 
 scope_re_cache = dict()
-
 
 
 def create_jinja_env(path) -> jinja2.Environment:
@@ -304,14 +303,17 @@ def main():
     for key, data in var_map["namespaces"].items():
         # This is safer for use with http urls
         name = data["name"]
-        if any((ns in name for ns in allowed_namespaces)):
-            namespace_id = key
-            out_name = namespace_id + ".rst"
-            out_file = out_dir / out_name
-            ctx = Context({}, name)
-            with open(out_file, "w") as f:
-                string_data = stringify(data, ctx=ctx)
-                f.write(namespace_template.render(string_data))
+        namespace_id = key
+        out_name = namespace_id + ".rst"
+        out_file = out_dir / out_name
+        data["hidden"] = not (any((ns in name for ns in allowed_namespaces)) and any(len(m) for m in data["sectiondef"].values()))
+        for sec, members in data["sectiondef"].items():
+            members = OrderedDict(sorted(members.items(), key=lambda t: t[1]["name"]))
+            data["sectiondef"][sec] = members
+        ctx = Context({}, name)
+        with open(out_file, "w") as f:
+            string_data = stringify(data, ctx=ctx)
+            f.write(namespace_template.render(string_data))
 
 
     # out_globs = out_dir / "globals.rst"
