@@ -17,9 +17,10 @@
 .. toctree::
 		:maxdepth: 1
 		:caption: Namespace Reference
-		:name: toc-class-ref
+		:name: toc-namespace-ref
 
-{% for key in namespaces %}
+{% for key, ns in namespaces.items() %}{% if not ns.hidden %}
 		{{ key }}
+{% endif %}
 {% endfor %}
 {% endif %}

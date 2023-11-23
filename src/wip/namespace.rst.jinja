@@ -40,7 +40,7 @@
 {%- endmacro%}
 
 {% macro print_template_parameter(param) -%}
-{{ param["type"]}}{{ " " ~ param.get("defname", "") }}
+{{ param["type"]}}{{ " " ~ param.defname if param.defname else "" }}{{ " = " ~ param.defval if param.defval else "" }}
 {%- endmacro %}
 
 
@@ -73,18 +73,34 @@ template<>
 
 
 {% if sectiondef["func"]|length > 0 %}
-.. rst-class:: classref-reftable-group
 
 Functions
 ---------
 
-{% for id in sectiondef["func"]|sort(attribute="name") %}
-{% set func = sectiondef["func"][id] %}
+{% for id, func in sectiondef.func.items() %}
 .. _{{ id }}:
 
-.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }}{{ func.definition }}{{ func.argsstring }}
+.. cpp:function:: {{ print_func_tparams(func) }} {{ print_func_qualifier(func) }} {{ func.definition }}{{ func.argsstring }}
 
 {{ print_desc(func.briefdescription, level=1) }}
 {{ print_desc(func.detaileddescription, level=1) }}
 {% endfor %}
 {% endif %}
+
+
+{% if sectiondef.typedef|length > 0 %}
+
+Type Aliases
+------------
+
+{% for id, func in sectiondef.typedef.items() %}
+.. _{{ id }}:
+
+.. cpp:type:: {{ print_func_tparams(func) }} {{ func.definition }}
+
+{{ print_desc(func.briefdescription, level=1) }}
+{{ print_desc(func.detaileddescription, level=1) }}
+{% endfor %}
+{% endif %}
+
+
