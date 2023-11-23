@@ -158,6 +158,11 @@ def stringify(expr, ctx: Context = Context({})):
             role = "tparam" if kwargs.get("@kind", "") == "templateparam" else "param"
             items = stringify(items, ctx)
             return [{"@role": f"{role} {item['name']}", "lines": item["desc"]} for item in items]
+        case {"@kind": "typedef", "definition": text, **kwargs}:
+            def_text = stringify(text, ctx)
+            if "using " in def_text:
+                def_text = def_text.replace("typedef ", "")
+            return {"@kind": "typedef", "definition": def_text, **stringify(kwargs, ctx)}
         case {"para": para}:
             paragraphs = []
             for p in para:
