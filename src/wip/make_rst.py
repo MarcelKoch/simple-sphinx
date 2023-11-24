@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import dataclasses as dc
 import json
 import random
 import sys
@@ -36,7 +37,8 @@ scope_re_cache = dict()
 
 def create_jinja_env(path) -> jinja2.Environment:
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(path),
-                             keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
+                             keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True,
+                             extensions=["jinja2.ext.debug"])
     return env
 
 
@@ -57,9 +59,12 @@ def is_class_name_specialization(name):
 class Context(object):
     class_names: dict
     scope: str | None = None
+    raw: bool = False
 
 
 def stringify(expr, ctx: Context = Context({})):
+    raw_ctx = dc.replace(ctx, raw=True)
+
     def remove_matching_braces(s: str) -> str:
         if len(s) == 0:
             return str()
@@ -109,14 +114,15 @@ def stringify(expr, ctx: Context = Context({})):
         case {"@id": id, **kwargs}:
             return stringify({"id": id, **kwargs}, ctx)
         case {"@refid": id, "#text": label}:
-            bracket_replacement = '\\<'
-            id_str = f"<{id}>" if id else ""
-            return f":std:ref:`{label.replace('<', bracket_replacement)}{id_str}`"
+            if ctx.raw:
+                return label
+            else:
+                bracket_replacement = '\\<'
+                id_str = f"<{id}>" if id else ""
+                return f":std:ref:`{label.replace('<', bracket_replacement)}{id_str}`"
         case {"@refid": id, "scope": {"#text": label_scope}, "name": name}:
-            bracket_replacement = '\\<'
-            id_str = f"<{id}>" if id else ""
             label = "::".join((label_scope, name)) if label_scope else name
-            return f":std:ref:`{label.replace('<', bracket_replacement)}{id_str}`"
+            return stringify({"@refid": id, "#text": label})
         case {"ref": ref}:
             return stringify(ref, ctx)
         case {"formula": {"#text": code}}:
@@ -133,9 +139,9 @@ def stringify(expr, ctx: Context = Context({})):
         case {"computeroutput": {"#text": code}}:
             return f":code:`{code}`"
         case {"codeline": code}:
-            return stringify(code)
+            return stringify(code, raw_ctx)
         case {"programlisting": {"style": style, **para}}:
-            return {"@directive": "code-block", "@opts": style, "lines": stringify(para)}
+            return {"@directive": "code-block", "@opts": style, "lines": stringify(para, raw_ctx)}
         case {"simplesect": {"@kind": "see", **para}}:
             return f"see {force_single_line(stringify(para))}"
         case {"simplesect": {"@kind": "return", **para}}:
@@ -150,18 +156,20 @@ def stringify(expr, ctx: Context = Context({})):
             return ["\n"] + [f"{n}. {force_single_line(stringify(item['para']))}" for n, item in enumerate(items)] + ["\n"]
         case {"blockquote": para}:
             return {"@directive": "epigraph", "lines": stringify(para)}
+        case {"type": t, **kwargs}:
+            return {"type": stringify(t, raw_ctx), **stringify(kwargs, raw_ctx)}
         case {"parameternamelist": {"parametername": name}, "parameterdescription": desc}:
             desc = force_single_line(stringify(desc))
-            return {"name": stringify(name, ctx), "desc": desc}
+            return {"name": stringify(name, raw_ctx), "desc": desc}
         case {"parameterlist": {"parameteritem": items, **kwargs}}:
             role = "tparam" if kwargs.get("@kind", "") == "templateparam" else "param"
             items = stringify(items, ctx)
             return [{"@role": f"{role} {item['name']}", "lines": item["desc"]} for item in items]
         case {"@kind": "typedef", "definition": text, **kwargs}:
-            def_text = stringify(text, ctx)
+            def_text = stringify(text, raw_ctx)
             if "using " in def_text:
                 def_text = def_text.replace("typedef ", "")
-            return {"@kind": "typedef", "definition": def_text, **stringify(kwargs, ctx)}
+            return {"@kind": "typedef", "definition": def_text, **stringify(kwargs, raw_ctx)}
         case {"para": para}:
             paragraphs = []
             for p in para:
@@ -195,7 +203,7 @@ def stringify(expr, ctx: Context = Context({})):
             data = {
                 **stringify(kwargs, ctx),
                 "inherited": {
-                    pid: stringify(v, Context(ctx.class_names, ctx.class_names[pid])) for pid, v in parents.items()
+                    pid: stringify(v, dc.replace(ctx, scope=ctx.class_names[pid])) for pid, v in parents.items()
                 }
             }
             return data

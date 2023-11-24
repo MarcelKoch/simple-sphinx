@@ -58,7 +58,7 @@ None
 {%- endmacro%}
 
 {% macro print_template_parameter(param) -%}
-{{ param["type"]}}{{ " " ~ param.get("defname", "") }}
+{{ param["type"]}}{{ " " ~ param.defname if param.defname else "" }}{{ " = " ~ param.defval if param.defval else "" }}
 {%- endmacro %}
 
 
@@ -83,7 +83,7 @@ template<>
 {{ name }}
 {% for i in name %}={% endfor %}
 
-.. cpp:class:: {{ print_templateparameters(templateparamlist)}} {{ name }}
+.. cpp:{{ context["@kind"] }}:: {{ print_templateparameters(templateparamlist)}} {{ name }}
 {% filter indent(3, first=True) %}
 
 {% for param in templatedescription %}
